@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# 데이터 파일
+data/audio/*.mp3
+data/audio/*.wav
+data/audio/*.m4a
+data/output/*.json
+
+# 모델 캐시
+.cache/
+models/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 예외: 샘플 파일은 추적
+!data/audio/.gitkeep
+!data/output/.gitkeep
