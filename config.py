@@ -23,8 +23,8 @@ class STTConfig:
     OUTPUT_DIR = "data/output"
 
     # 노이즈 처리 설정
-    NOISE_REDUCTION = False  # 노이즈 제거 전처리 (noisereduce 필요)
-    VAD_FILTER = False  # Voice Activity Detection 필터
+    NOISE_REDUCTION = True  # 노이즈 제거 전처리 (noisereduce 필요)
+    VAD_FILTER = True  # Voice Activity Detection 필터
     VAD_THRESHOLD = 0.5  # VAD 임계값 (0.0~1.0)
 
     # Initial Prompt (Whisper에게 제공할 힌트)

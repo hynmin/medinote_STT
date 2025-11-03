@@ -33,14 +33,9 @@ def main():
     )
     
     parser.add_argument(
-        "--no-save",
+        "--no-db",
         action="store_true",
-        help="결과를 파일로 저장하지 않음"
-    )
-    parser.add_argument(
-        "--save-db",
-        action="store_true",
-        help="결과를 SQLite DB로도 저장"
+        help="DB 저장 비활성화 (기본: DB에 저장)"
     )
     parser.add_argument(
         "--db-path",
@@ -61,28 +56,29 @@ def main():
         help="평가용 참조 텍스트 파일 경로(UTF-8)"
     )
     parser.add_argument(
-        "--noise-reduction",
+        "--no-noise-reduction",
         action="store_true",
-        help="노이즈 제거 전처리 사용 (noisereduce 필요)"
+        help="노이즈 제거 비활성화 (기본: 활성화)"
     )
     parser.add_argument(
-        "--vad-filter",
+        "--no-vad-filter",
         action="store_true",
-        help="VAD (Voice Activity Detection) 필터 사용"
+        help="VAD 필터 비활성화 (기본: 활성화)"
     )
 
     args = parser.parse_args()
 
-    # STT 엔진 초기화
+    # STT 엔진 초기화 (기본적으로 noise_reduction과 vad_filter 활성화)
     stt = MedicalSTT(
         model_type=args.model,
         enable_diarization=args.diarization,
-        noise_reduction=args.noise_reduction,
-        vad_filter=args.vad_filter
+        noise_reduction=not args.no_noise_reduction,
+        vad_filter=not args.no_vad_filter
     )
-    
-    # DB 초기화 (옵션)
-    if args.save_db:
+
+    # DB 초기화 (기본적으로 활성화, --no-db로 비활성화 가능)
+    save_to_db = not args.no_db
+    if save_to_db:
         init_db(args.db_path)
     
     audio_path = Path(args.audio_path)
@@ -91,7 +87,7 @@ def main():
     if audio_path.is_file():
         result = stt.transcribe(
             str(audio_path),
-            save_result=not args.no_save
+            save_result=False  # JSON 파일 생성 안 함 (DB만 사용)
         )
 
         # 화자 분리 사용시
@@ -107,8 +103,8 @@ def main():
             print("="*50)
             print(result["text"])
 
-        # DB 저장 (옵션)
-        if args.save_db:
+        # DB 저장 (기본 활성화)
+        if save_to_db:
             # RTF 계산
             from metrics import compute_rtf
             rtf_info = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
@@ -118,8 +114,8 @@ def main():
                 result.get("processing_time"),
                 result.get("audio_duration"),
                 rtf_info.get("rtf"),
-                args.noise_reduction,
-                args.vad_filter,
+                not args.no_noise_reduction,
+                not args.no_vad_filter,
                 args.db_path
             )
             save_segments(tid, result.get("segments", []), args.db_path)
@@ -137,8 +133,8 @@ def main():
             m = compute_metrics(ref_text, result.get("text", ""))
             print("\n📐 Metrics")
             print(f"  WER: {m['wer']:.4f}  CER: {m['cer']:.4f}")
-            if args.save_db:
-                # tid exists only if --save-db was used
+            if save_to_db:
+                # tid exists only if DB saving is enabled
                 save_metrics(tid, m, args.db_path)
                 print("  ↳ saved to DB (metrics)")
 
@@ -166,9 +162,9 @@ def main():
             print(f"\n[{i}/{len(audio_files)}] {audio_file.name}")
             result = stt.transcribe(
                 str(audio_file),
-                save_result=not args.no_save
+                save_result=False  # JSON 파일 생성 안 함 (DB만 사용)
             )
-            if args.save_db:
+            if save_to_db:
                 # RTF 계산
                 from metrics import compute_rtf
                 rtf_info = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
@@ -178,8 +174,8 @@ def main():
                     result.get("processing_time"),
                     result.get("audio_duration"),
                     rtf_info.get("rtf"),
-                    args.noise_reduction,
-                    args.vad_filter,
+                    not args.no_noise_reduction,
+                    not args.no_vad_filter,
                     args.db_path
                 )
                 save_segments(tid, result.get("segments", []), args.db_path)
@@ -196,7 +192,7 @@ def main():
             if ref_text:
                 m = compute_metrics(ref_text, result.get("text", ""))
                 print(f"  📐 WER: {m['wer']:.4f}  CER: {m['cer']:.4f}")
-                if args.save_db:
+                if save_to_db:
                     save_metrics(tid, m, args.db_path)
         
         print("\n" + "="*50)

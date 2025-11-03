@@ -62,7 +62,7 @@ python main.py audio.mp3 --diarization
 #### 평가 지표
 ```bash
 
-python main.py audio.mp3 --reference data/reference/audio_transcript.txt
+python main.py data/audio/doctor_conversation.mp3 --ref-file data/reference.txt --model fast
 
 ```
 
