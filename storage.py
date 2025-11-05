@@ -11,6 +11,8 @@ def init_db(db_path: str):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(db_path)
     cur = con.cursor()
+    
+    #STT 테이블 생성
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS transcripts (
@@ -29,6 +31,8 @@ def init_db(db_path: str):
         )
         """
     )
+    
+    ##segments - 음성 인식 결과의 세그먼트(구간) 데이터를 저장 1:N 관계
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS segments (
@@ -42,6 +46,8 @@ def init_db(db_path: str):
         )
         """
     )
+    
+    #metrics - 음성인식 결과에 대한 평가 지표 저장 1:1 관계
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS metrics (
@@ -56,6 +62,24 @@ def init_db(db_path: str):
         )
         """
     )
+    # STT 요약정리 저장 1:1 관계
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            transcript_id INTEGER NOT NULL,
+            chief_complaint TEXT,
+            diagnosis TEXT,
+            medication TEXT,
+            lifestyle_management TEXT,
+            model TEXT,
+            summary_time REAL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(transcript_id) REFERENCES transcripts(id)
+        )
+        """
+    )
+    
     con.commit()
     con.close()
 
@@ -140,3 +164,61 @@ def save_metrics(transcript_id: int, metrics: dict, db_path: str):
     )
     con.commit()
     con.close()
+
+
+def save_summary(
+    transcript_id: int,
+    chief_complaint: str,
+    diagnosis: str,
+    medication: str,
+    lifestyle_management: str,
+    model: str,
+    summary_time: float,
+    db_path: str
+) -> int:
+    """
+    AI 요약 결과를 summaries 테이블에 저장
+
+    Args:
+        transcript_id: transcripts 테이블의 ID (외래키)
+        chief_complaint: 주요 증상
+        diagnosis: 진단
+        medication: 약물 처방
+        lifestyle_management: 생활 관리 및 재방문
+        model: 사용한 GPT 모델 (예: gpt-4o-mini)
+        summary_time: 요약 생성 시간(초)
+        db_path: DB 파일 경로
+
+    Returns:
+        생성된 summary의 ID
+    """
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO summaries (
+            transcript_id, chief_complaint, diagnosis,
+            medication, lifestyle_management, model, summary_time
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            transcript_id,
+            chief_complaint,
+            diagnosis,
+            medication,
+            lifestyle_management,
+            model,
+            float(summary_time) if summary_time is not None else None,
+        ),
+    )
+
+    summary_id = cur.lastrowid
+    con.commit()
+    con.close()
+
+    return summary_id
+
+
+

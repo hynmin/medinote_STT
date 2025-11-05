@@ -4,9 +4,14 @@ STT 실행 메인 파일
 import argparse
 from pathlib import Path
 from stt_engine import MedicalSTT
-from storage import init_db, save_transcript, save_segments, save_metrics
+from storage import init_db, save_transcript, save_segments, save_metrics, save_summary
 from metrics import compute_metrics
 from config import STTConfig
+from summary import generate_summary
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 
 def main():
@@ -37,6 +42,7 @@ def main():
         action="store_true",
         help="DB 저장 비활성화 (기본: DB에 저장)"
     )
+    
     parser.add_argument(
         "--db-path",
         type=str,
@@ -121,6 +127,44 @@ def main():
             save_segments(tid, result.get("segments", []), args.db_path)
             print(f"🗄️  Saved to DB: {args.db_path} (transcript_id={tid})")
 
+            # AI 요약 생성
+            print("\n🤖 AI 요약 생성 중...")
+            try:
+                summary_result = generate_summary(
+                    transcript_text=result["text"],
+                    model="gpt-4o-mini"
+                )
+
+                summary_id = save_summary(
+                    transcript_id=tid,
+                    chief_complaint=summary_result["chief_complaint"],
+                    diagnosis=summary_result["diagnosis"],
+                    medication=summary_result["medication"],
+                    lifestyle_management=summary_result["lifestyle_management"],
+                    model=summary_result["model"],
+                    summary_time=summary_result["summary_time"],
+                    db_path=args.db_path
+                )
+
+                # 터미널에 요약 출력
+                print("\n" + "="*50)
+                print("🤖 AI 요약")
+                print("="*50)
+                print(f"\n📌 주요 증상:")
+                print(f"  {summary_result['chief_complaint']}")
+                print(f"\n🏥 진단:")
+                print(f"  {summary_result['diagnosis']}")
+                print(f"\n💊 약물 처방:")
+                print(f"  {summary_result['medication']}")
+                print(f"\n🏃 생활 관리:")
+                for line in summary_result['lifestyle_management'].split('\n'):
+                    if line.strip():
+                        print(f"  - {line.strip()}")
+                print(f"\n  ↳ 요약 생성 시간: {summary_result['summary_time']}초 (summary_id={summary_id})")
+
+            except Exception as e:
+                print(f"⚠️  AI 요약 생성 실패: {e}")
+
         # 평가지표 계산/출력/저장 (옵션)
         ref_text = args.ref_text
         if not ref_text and args.ref_file:
@@ -180,6 +224,26 @@ def main():
                 )
                 save_segments(tid, result.get("segments", []), args.db_path)
                 print(f"🗄️  Saved to DB: {args.db_path} (transcript_id={tid})")
+
+                # AI 요약 생성
+                try:
+                    summary_result = generate_summary(
+                        transcript_text=result["text"],
+                        model="gpt-4o-mini"
+                    )
+                    summary_id = save_summary(
+                        transcript_id=tid,
+                        chief_complaint=summary_result["chief_complaint"],
+                        diagnosis=summary_result["diagnosis"],
+                        medication=summary_result["medication"],
+                        lifestyle_management=summary_result["lifestyle_management"],
+                        model=summary_result["model"],
+                        summary_time=summary_result["summary_time"],
+                        db_path=args.db_path
+                    )
+                    print(f"  🤖 AI Summary generated (summary_id={summary_id})")
+                except Exception as e:
+                    print(f"  ⚠️  Summary failed: {e}")
 
             # 파일별 평가지표(참조가 제공된 경우)
             ref_text = args.ref_text

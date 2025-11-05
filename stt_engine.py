@@ -108,8 +108,6 @@ class MedicalSTT:
 
         # VAD 필터 설정
         if self.vad_filter:
-            generate_kwargs["vad_filter"] = True
-            generate_kwargs["chunk_length_s"] = 30  # VAD 처리 청크 크기
             print("  🎯 Using VAD filter (Voice Activity Detection)...")
 
         # 노이즈 제거 전처리

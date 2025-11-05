@@ -27,6 +27,10 @@ pip install -r requirements.txt
 set HF_TOKEN=your_token_here       # Windows
 export HF_TOKEN=your_token_here    # Mac/Linux
 
+#실행
+venv\Scripts\Activate.ps1
+venv\Scripts\activate.bat
+
 ```
 
 ### 2. 사용법
@@ -160,8 +164,11 @@ export STT_MODEL=balanced
 | balanced | 769MB | ⚡⚡ | ⭐⭐⭐⭐ | 배포 |
 | accurate | 1.5GB | ⚡ | ⭐⭐⭐⭐⭐ | 고품질 |
 
-## 🧪 테스트
 
+### GPT 요약정리
+
+
+## 🧪 테스트
 ```bash
 python -m pytest tests/
 # 또는
