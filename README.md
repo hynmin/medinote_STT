@@ -1,14 +1,17 @@
 # 의료 상담 STT (Speech-to-Text)
 
-의료 상담 음성을 텍스트로 변환하고 화자를 분리하는 프로젝트
+의료 상담 음성을 텍스트로 변환하고 AI 요약을 생성하는 프로젝트
 
 ## ✨ 주요 기능
 
 - 🎙️ **Whisper 기반 STT**: 고정확도 한국어 음성 인식
-- 👥 **화자 자동 감지**: PyAnnote 기반 자동 화자 구별 (의사/환자)
-- 📊 **평가 지표**: WER/CER 자동 계산 및 저장
-- 💾 **데이터베이스**: SQLite 기반 변환 결과 및 메타데이터 저장 (추후: MySQL)
-- 📋 **CLI 출력**: 터미널에서 결과 및 통계 확인
+- 🤖 **AI 요약**: GPT-4o-mini 기반 의료 상담 요약 (주요 증상, 진단, 처방, 생활관리)
+- 🔊 **노이즈 제거**: noisereduce 라이브러리 기반 전처리
+- 🎯 **VAD 필터**: Voice Activity Detection으로 음성 구간만 처리
+- 💾 **SQLite 저장**: 변환 결과 및 메타데이터 저장 (향후: PostgreSQL)
+        - 요약정리(탈퇴시까지)
+        - 전체텍스트(7일 - 성능테스트용도)
+- ☁️ **AWS 연동 준비**: S3 음성 파일 저장(7일), EC2 배포 예정
 
 
 ## 🚀 빠른 시작
@@ -126,23 +129,22 @@ print(f"WER: {result['metrics']['wer']:.2%}")
 ## 📁 프로젝트 구조
 
 ```
-stt/
-├── config.py # 모델 및 화자 분리 설정
-├── stt_engine.py # STT 엔진 (Whisper)
-├── diarization.py # 화자 자동 분리 엔진 (PyAnnote)
-├── metrics.py # WER/CER 계산
-├── db_manager.py # SQLite 데이터베이스 관리
-├── main.py # CLI 실행
+sound_to_text/
+├── main.py              # CLI 실행
+├── record.py            # 마이크 녹음 (로컬 테스트)
+├── stt_engine.py        # STT 엔진 (Whisper)
+├── summary.py           # AI 요약 (GPT-4o-mini)
+├── storage.py           # SQLite 저장
+├── metrics.py           # 품질 평가
+├── config.py            # 설정
 ├── requirements.txt
-├── data/
-│ ├── audio/ # 입력 오디오 파일
-│ ├── reference/ # 정답 텍스트 파일 (평가용)
-│ └── output/ # 변환 결과 텍스트
-├── results/
-│ └── transcriptions.db # 데이터베이스
-└── transcriptions.db
-
-
+├── .env                 # 환경 변수 (OpenAI API Key)
+└── data/
+    ├── audio/           # 테스트용 오디오 파일
+    ├── recordings/      # 녹음 파일 (임시, 향후 S3)
+    ├── output/          # 변환 결과
+    │   └── transcripts.db  # SQLite 데이터베이스
+    └── reference.txt    # 평가용 참조 텍스트
 ```
 
 ## 🔧 환경 변수
@@ -175,3 +177,32 @@ python -m pytest tests/
 python tests/test_stt.py
 ```
 
+### 오류 해결
+**FFmpeg/torchcodec 문제:**
+- `pip uninstall torchcodec` 실행
+- transformers가 자동으로 librosa fallback 사용
+
+## 🗺️ 로드맵
+
+### 현재 (로컬 개발)
+- ✅ STT 엔진 (Whisper)
+- ✅ AI 요약 (GPT-4o-mini)
+- ✅ SQLite 저장
+- ✅ 노이즈 제거 & VAD 필터
+
+### 다음 단계
+
+#### 🎙️ 녹음 기능
+- **현재:** CLI 기반 녹음 (python record.py)
+  - 로컬 테스트용
+  - `data/recordings/` 임시 저장
+- **향후:** React Native WebView + FastAPI
+  - 버튼 클릭 녹음
+  - S3 직접 업로드
+  - JavaScript/HTML 추가
+
+#### ☁️ 인프라
+- [ ] AWS S3 연동 (오디오 파일 7일 보관)
+- [ ] FastAPI 서버 (녹음 → S3 → STT)
+- [ ] PostgreSQL 마이그레이션
+- [ ] AWS EC2 배포
