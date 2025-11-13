@@ -1,5 +1,13 @@
 """
-개발용 SQLite 저장 유틸리티
+SQLite/PostgreSQL 데이터베이스 저장 유틸리티
+
+주요 기능:
+- init_db: 데이터베이스 및 테이블 초기화
+- save_transcript: STT 변환 결과 저장
+- save_metrics: 평가 지표 저장 (개발/테스트용)
+- save_summary: AI 요약 결과 저장
+
+향후 PostgreSQL 마이그레이션 시 이 파일만 수정
 """
 import sqlite3
 from pathlib import Path
@@ -12,7 +20,7 @@ def init_db(db_path: str):
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     
-    #STT 테이블 생성
+    # STT 테이블 생성
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS transcripts (
@@ -20,34 +28,16 @@ def init_db(db_path: str):
             audio_file TEXT,
             model TEXT,
             text TEXT,
-            diarization_enabled INTEGER,
-            num_speakers INTEGER,
             processing_time REAL,
             audio_duration REAL,
             rtf REAL,
             noise_reduction INTEGER,
-            vad_filter INTEGER,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
-    
-    ##segments - 음성 인식 결과의 세그먼트(구간) 데이터를 저장 1:N 관계
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS segments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            transcript_id INTEGER NOT NULL,
-            speaker TEXT,
-            text TEXT,
-            start_sec REAL,
-            end_sec REAL,
-            FOREIGN KEY(transcript_id) REFERENCES transcripts(id)
-        )
-        """
-    )
-    
-    #metrics - 음성인식 결과에 대한 평가 지표 저장 1:1 관계
+
+    # metrics - 음성인식 결과에 대한 평가 지표 저장 1:1 관계
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS metrics (
@@ -84,27 +74,24 @@ def init_db(db_path: str):
     con.close()
 
 
-def save_transcript(result: dict, processing_time: float, audio_duration: float, rtf: float, noise_reduction: bool, vad_filter: bool, db_path: str) -> int:
+def save_transcript(result: dict, processing_time: float, audio_duration: float, rtf: float, noise_reduction: bool, db_path: str) -> int:
     """transcripts 테이블에 저장하고 id 반환."""
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     cur.execute(
         """
         INSERT INTO transcripts (
-            audio_file, model, text, diarization_enabled, num_speakers, processing_time, audio_duration, rtf, noise_reduction, vad_filter, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            audio_file, model, text, processing_time, audio_duration, rtf, noise_reduction, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             result.get("audio_file"),
             result.get("model"),
             result.get("text"),
-            1 if result.get("segments") else 0,
-            int(result.get("num_speakers", 0)),
             float(processing_time) if processing_time is not None else None,
             float(audio_duration) if audio_duration is not None else None,
             float(rtf) if rtf is not None else None,
             1 if noise_reduction else 0,
-            1 if vad_filter else 0,
             datetime.now().isoformat(),
         ),
     )
@@ -112,34 +99,6 @@ def save_transcript(result: dict, processing_time: float, audio_duration: float,
     con.commit()
     con.close()
     return tid
-
-
-def save_segments(transcript_id: int, segments: list, db_path: str):
-    """segments 테이블에 일괄 저장."""
-    if not segments:
-        return
-    con = sqlite3.connect(db_path)
-    cur = con.cursor()
-    rows = [
-        (
-            transcript_id,
-            s.get("speaker"),
-            s.get("text"),
-            float(s.get("start", 0.0)),
-            float(s.get("end", 0.0)),
-        )
-        for s in segments
-    ]
-    cur.executemany(
-        """
-        INSERT INTO segments (
-            transcript_id, speaker, text, start_sec, end_sec
-        ) VALUES (?, ?, ?, ?, ?)
-        """,
-        rows,
-    )
-    con.commit()
-    con.close()
 
 
 def save_metrics(transcript_id: int, metrics: dict, db_path: str):

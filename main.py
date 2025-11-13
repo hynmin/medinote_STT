@@ -4,14 +4,30 @@ STT 실행 메인 파일
 import argparse
 from pathlib import Path
 from stt_engine import MedicalSTT
-from storage import init_db, save_transcript, save_segments, save_metrics, save_summary
-from metrics import compute_metrics
+from db_storage import init_db, save_transcript, save_metrics, save_summary
+from metrics import compute_metrics, compute_rtf
 from config import STTConfig
 from summary import generate_summary
 from dotenv import load_dotenv
 
 # .env 파일 로드
 load_dotenv()
+
+
+def load_reference_text(args):
+    """
+    평가용 참조 텍스트 로드
+
+    TODO: 향후 의료 상담 평가 지표를 재정의할 때 이 함수와 관련 코드를 수정/삭제
+    """
+    ref_text = args.ref_text
+    if not ref_text and args.ref_file:
+        try:
+            with open(args.ref_file, "r", encoding="utf-8") as rf:
+                ref_text = rf.read()
+        except Exception as e:
+            print(f"⚠️ Failed to read ref file: {e}")
+    return ref_text
 
 
 def main():
@@ -29,12 +45,6 @@ def main():
         choices=["fast", "balanced", "accurate"],
         default="fast",
         help="사용할 모델 (default: fast)"
-    )
-    
-    parser.add_argument(
-        "--diarization",
-        action="store_true",
-        help="화자 분리 사용 (의사/환자 구별)"
     )
     
     parser.add_argument(
@@ -66,20 +76,12 @@ def main():
         action="store_true",
         help="노이즈 제거 비활성화 (기본: 활성화)"
     )
-    parser.add_argument(
-        "--no-vad-filter",
-        action="store_true",
-        help="VAD 필터 비활성화 (기본: 활성화)"
-    )
-
     args = parser.parse_args()
 
-    # STT 엔진 초기화 (기본적으로 noise_reduction과 vad_filter 활성화)
+    # STT 엔진 초기화
     stt = MedicalSTT(
         model_type=args.model,
-        enable_diarization=args.diarization,
-        noise_reduction=not args.no_noise_reduction,
-        vad_filter=not args.no_vad_filter
+        noise_reduction=not args.no_noise_reduction
     )
 
     # DB 초기화 (기본적으로 활성화, --no-db로 비활성화 가능)
@@ -96,23 +98,15 @@ def main():
             save_result=False  # JSON 파일 생성 안 함 (DB만 사용)
         )
 
-        # 화자 분리 사용시
-        if args.diarization:
-            stt.print_conversation(result)
-            print(f"\n📊 요약")
-            print(f"  화자 수: {result['num_speakers']}명")
-            print(f"  대화 구간: {len(result['segments'])}개")
-        else:
-            # 화자 분리 없으면 텍스트만 출력
-            print("\n" + "="*50)
-            print("📄 변환 결과:")
-            print("="*50)
-            print(result["text"])
+        # 변환 결과 출력
+        print("\n" + "="*50)
+        print("📄 변환 결과:")
+        print("="*50)
+        print(result["text"])
 
         # DB 저장 (기본 활성화)
         if save_to_db:
             # RTF 계산
-            from metrics import compute_rtf
             rtf_info = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
 
             tid = save_transcript(
@@ -121,11 +115,15 @@ def main():
                 result.get("audio_duration"),
                 rtf_info.get("rtf"),
                 not args.no_noise_reduction,
-                not args.no_vad_filter,
                 args.db_path
             )
-            save_segments(tid, result.get("segments", []), args.db_path)
             print(f"🗄️  Saved to DB: {args.db_path} (transcript_id={tid})")
+
+            # RTF 출력
+            if result.get("audio_duration", 0) > 0:
+                print(f"\n⚡ Performance")
+                print(f"  RTF: {rtf_info['rtf']:.4f} (실시간보다 {rtf_info['speed_factor']:.2f}배 빠름)")
+                print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {result.get('audio_duration', 0):.2f}초")
 
             # AI 요약 생성 (텍스트가 있을 때만)
             if result["text"].strip():
@@ -169,13 +167,8 @@ def main():
                 print("\n⏭️  텍스트가 비어있어 AI 요약을 건너뜁니다.")
 
         # 평가지표 계산/출력/저장 (옵션)
-        ref_text = args.ref_text
-        if not ref_text and args.ref_file:
-            try:
-                with open(args.ref_file, "r", encoding="utf-8") as rf:
-                    ref_text = rf.read()
-            except Exception as e:
-                print(f"⚠️ Failed to read ref file: {e}")
+        # TODO: 향후 의료 상담 평가 지표를 재정의할 때 이 블록을 수정/삭제
+        ref_text = load_reference_text(args)
         if ref_text:
             m = compute_metrics(ref_text, result.get("text", ""))
             print("\n📐 Metrics")
@@ -185,89 +178,8 @@ def main():
                 save_metrics(tid, m, args.db_path)
                 print("  ↳ saved to DB (metrics)")
 
-        # RTF 계산 및 출력
-        if result.get("audio_duration", 0) > 0:
-            from metrics import compute_rtf
-            rtf_info = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
-            print(f"\n⚡ Performance")
-            print(f"  RTF: {rtf_info['rtf']:.4f} (실시간보다 {rtf_info['speed_factor']:.2f}배 빠름)")
-            print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {result.get('audio_duration', 0):.2f}초")
-    
-    # 디렉토리 내 모든 오디오 파일 처리
-    elif audio_path.is_dir():
-        audio_files = list(audio_path.glob("*.mp3")) + \
-                     list(audio_path.glob("*.wav")) + \
-                     list(audio_path.glob("*.m4a"))
-        
-        if not audio_files:
-            print(f"❌ No audio files found in {audio_path}")
-            return
-        
-        print(f"\n📦 Processing {len(audio_files)} files...")
-        
-        for i, audio_file in enumerate(audio_files, 1):
-            print(f"\n[{i}/{len(audio_files)}] {audio_file.name}")
-            result = stt.transcribe(
-                str(audio_file),
-                save_result=False  # JSON 파일 생성 안 함 (DB만 사용)
-            )
-            if save_to_db:
-                # RTF 계산
-                from metrics import compute_rtf
-                rtf_info = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
-
-                tid = save_transcript(
-                    result,
-                    result.get("processing_time"),
-                    result.get("audio_duration"),
-                    rtf_info.get("rtf"),
-                    not args.no_noise_reduction,
-                    not args.no_vad_filter,
-                    args.db_path
-                )
-                save_segments(tid, result.get("segments", []), args.db_path)
-                print(f"🗄️  Saved to DB: {args.db_path} (transcript_id={tid})")
-
-                # AI 요약 생성
-                try:
-                    summary_result = generate_summary(
-                        transcript_text=result["text"],
-                        model="gpt-4o-mini"
-                    )
-                    summary_id = save_summary(
-                        transcript_id=tid,
-                        chief_complaint=summary_result["chief_complaint"],
-                        diagnosis=summary_result["diagnosis"],
-                        medication=summary_result["medication"],
-                        lifestyle_management=summary_result["lifestyle_management"],
-                        model=summary_result["model"],
-                        summary_time=summary_result["summary_time"],
-                        db_path=args.db_path
-                    )
-                    print(f"  🤖 AI Summary generated (summary_id={summary_id})")
-                except Exception as e:
-                    print(f"  ⚠️  Summary failed: {e}")
-
-            # 파일별 평가지표(참조가 제공된 경우)
-            ref_text = args.ref_text
-            if not ref_text and args.ref_file:
-                try:
-                    with open(args.ref_file, "r", encoding="utf-8") as rf:
-                        ref_text = rf.read()
-                except Exception as e:
-                    print(f"⚠️ Failed to read ref file: {e}")
-            if ref_text:
-                m = compute_metrics(ref_text, result.get("text", ""))
-                print(f"  📐 WER: {m['wer']:.4f}  CER: {m['cer']:.4f}")
-                if save_to_db:
-                    save_metrics(tid, m, args.db_path)
-        
-        print("\n" + "="*50)
-        print(f"📊 배치 처리 완료: {len(audio_files)}개 파일")
-        print("="*50)
-    
     else:
-        print(f"❌ Invalid path: {audio_path}")
+        print(f"❌ Invalid audio file path: {audio_path}")
 
 
 if __name__ == "__main__":
