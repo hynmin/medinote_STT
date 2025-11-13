@@ -20,10 +20,10 @@ def init_db(db_path: str):
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     
-    # STT 테이블 생성
+    # STT 변환 결과 테이블
     cur.execute(
         """
-        CREATE TABLE IF NOT EXISTS transcripts (
+        CREATE TABLE IF NOT EXISTS STT_Transcript (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             audio_file TEXT,
             model TEXT,
@@ -37,10 +37,10 @@ def init_db(db_path: str):
         """
     )
 
-    # metrics - 음성인식 결과에 대한 평가 지표 저장 1:1 관계
+    # STT 평가 지표 테이블 (개발/테스트용)
     cur.execute(
         """
-        CREATE TABLE IF NOT EXISTS metrics (
+        CREATE TABLE IF NOT EXISTS STT_Metric (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             transcript_id INTEGER NOT NULL,
             wer REAL,
@@ -48,14 +48,14 @@ def init_db(db_path: str):
             ref_chars INTEGER,
             hyp_chars INTEGER,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(transcript_id) REFERENCES transcripts(id)
+            FOREIGN KEY(transcript_id) REFERENCES STT_Transcript(id)
         )
         """
     )
-    # STT 요약정리 저장 1:1 관계
+    # STT 요약 결과 테이블
     cur.execute(
         """
-        CREATE TABLE IF NOT EXISTS summaries (
+        CREATE TABLE IF NOT EXISTS STT_Summary (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             transcript_id INTEGER NOT NULL,
             chief_complaint TEXT,
@@ -65,7 +65,7 @@ def init_db(db_path: str):
             model TEXT,
             summary_time REAL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(transcript_id) REFERENCES transcripts(id)
+            FOREIGN KEY(transcript_id) REFERENCES STT_Transcript(id)
         )
         """
     )
@@ -75,12 +75,12 @@ def init_db(db_path: str):
 
 
 def save_transcript(result: dict, processing_time: float, audio_duration: float, rtf: float, noise_reduction: bool, db_path: str) -> int:
-    """transcripts 테이블에 저장하고 id 반환."""
+    """STT_Transcript 테이블에 저장하고 id 반환."""
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     cur.execute(
         """
-        INSERT INTO transcripts (
+        INSERT INTO STT_Transcript (
             audio_file, model, text, processing_time, audio_duration, rtf, noise_reduction, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -102,14 +102,14 @@ def save_transcript(result: dict, processing_time: float, audio_duration: float,
 
 
 def save_metrics(transcript_id: int, metrics: dict, db_path: str):
-    """metrics 테이블에 저장."""
+    """STT_Metric 테이블에 저장."""
     if not metrics:
         return
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     cur.execute(
         """
-        INSERT INTO metrics (
+        INSERT INTO STT_Metric (
             transcript_id, wer, cer, ref_chars, hyp_chars
         ) VALUES (?, ?, ?, ?, ?)
         """,
@@ -136,10 +136,10 @@ def save_summary(
     db_path: str
 ) -> int:
     """
-    AI 요약 결과를 summaries 테이블에 저장
+    AI 요약 결과를 STT_Summary 테이블에 저장
 
     Args:
-        transcript_id: transcripts 테이블의 ID (외래키)
+        transcript_id: STT_Transcript 테이블의 ID (외래키)
         chief_complaint: 주요 증상
         diagnosis: 진단
         medication: 약물 처방
@@ -156,7 +156,7 @@ def save_summary(
 
     cur.execute(
         """
-        INSERT INTO summaries (
+        INSERT INTO STT_Summary (
             transcript_id, chief_complaint, diagnosis,
             medication, lifestyle_management, model, summary_time
         )
