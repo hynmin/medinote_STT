@@ -127,43 +127,46 @@ def main():
             save_segments(tid, result.get("segments", []), args.db_path)
             print(f"🗄️  Saved to DB: {args.db_path} (transcript_id={tid})")
 
-            # AI 요약 생성
-            print("\n🤖 AI 요약 생성 중...")
-            try:
-                summary_result = generate_summary(
-                    transcript_text=result["text"],
-                    model="gpt-4o-mini"
-                )
+            # AI 요약 생성 (텍스트가 있을 때만)
+            if result["text"].strip():
+                print("\n🤖 AI 요약 생성 중...")
+                try:
+                    summary_result = generate_summary(
+                        transcript_text=result["text"],
+                        model="gpt-4o-mini"
+                    )
 
-                summary_id = save_summary(
-                    transcript_id=tid,
-                    chief_complaint=summary_result["chief_complaint"],
-                    diagnosis=summary_result["diagnosis"],
-                    medication=summary_result["medication"],
-                    lifestyle_management=summary_result["lifestyle_management"],
-                    model=summary_result["model"],
-                    summary_time=summary_result["summary_time"],
-                    db_path=args.db_path
-                )
+                    summary_id = save_summary(
+                        transcript_id=tid,
+                        chief_complaint=summary_result["chief_complaint"],
+                        diagnosis=summary_result["diagnosis"],
+                        medication=summary_result["medication"],
+                        lifestyle_management=summary_result["lifestyle_management"],
+                        model=summary_result["model"],
+                        summary_time=summary_result["summary_time"],
+                        db_path=args.db_path
+                    )
 
-                # 터미널에 요약 출력
-                print("\n" + "="*50)
-                print("🤖 AI 요약")
-                print("="*50)
-                print(f"\n📌 주요 증상:")
-                print(f"  {summary_result['chief_complaint']}")
-                print(f"\n🏥 진단:")
-                print(f"  {summary_result['diagnosis']}")
-                print(f"\n💊 약물 처방:")
-                print(f"  {summary_result['medication']}")
-                print(f"\n🏃 생활 관리:")
-                for line in summary_result['lifestyle_management'].split('\n'):
-                    if line.strip():
-                        print(f"  - {line.strip()}")
-                print(f"\n  ↳ 요약 생성 시간: {summary_result['summary_time']}초 (summary_id={summary_id})")
+                    # 터미널에 요약 출력
+                    print("\n" + "="*50)
+                    print("🤖 AI 요약")
+                    print("="*50)
+                    print(f"\n📌 주요 증상:")
+                    print(f"  {summary_result['chief_complaint']}")
+                    print(f"\n🏥 진단:")
+                    print(f"  {summary_result['diagnosis']}")
+                    print(f"\n💊 약물 처방:")
+                    print(f"  {summary_result['medication']}")
+                    print(f"\n🏃 생활 관리:")
+                    for line in summary_result['lifestyle_management'].split('\n'):
+                        if line.strip():
+                            print(f"  - {line.strip()}")
+                    print(f"\n  ↳ 요약 생성 시간: {summary_result['summary_time']}초 (summary_id={summary_id})")
 
-            except Exception as e:
-                print(f"⚠️  AI 요약 생성 실패: {e}")
+                except Exception as e:
+                    print(f"⚠️  AI 요약 생성 실패: {e}")
+            else:
+                print("\n⏭️  텍스트가 비어있어 AI 요약을 건너뜁니다.")
 
         # 평가지표 계산/출력/저장 (옵션)
         ref_text = args.ref_text

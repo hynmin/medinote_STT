@@ -27,6 +27,10 @@ class STTConfig:
     VAD_FILTER = True  # Voice Activity Detection 필터
     VAD_THRESHOLD = 0.5  # VAD 임계값 (0.0~1.0)
 
+    # 무음/짧은 오디오 감지 설정 (환청 방지)
+    MIN_AUDIO_DURATION = 1.0  # 최소 오디오 길이 (초)
+    SILENCE_RMS_THRESHOLD = 0.05  # 무음 판정 임계값 (RMS 에너지)
+
     # Initial Prompt (Whisper에게 제공할 힌트)
     INITIAL_PROMPT = "의료 상담 대화 녹음입니다. 의료종사자와 환자의 대화만 변환하세요."
     

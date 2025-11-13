@@ -100,6 +100,39 @@ class MedicalSTT:
         # 오디오 길이 측정
         audio_duration = self._get_audio_duration(audio_path)
 
+        # 오디오 로드하여 에너지 레벨 체크
+        y, sr = librosa.load(audio_path, sr=16000, mono=True)
+
+        # 1) 너무 짧은 오디오 체크
+        if audio_duration < STTConfig.MIN_AUDIO_DURATION:
+            print(f"  🔇 Audio too short ({audio_duration:.1f}s < {STTConfig.MIN_AUDIO_DURATION}s). Returning empty result.")
+            processing_time = time.time() - start_time
+            return {
+                "text": "",
+                "audio_file": Path(audio_path).name,
+                "model": self.model_name,
+                "processing_time": round(processing_time, 2),
+                "audio_duration": round(audio_duration, 2),
+                "rtf": round(processing_time / max(audio_duration, 0.001), 4),
+                "num_speakers": 0
+            }
+
+        # 2) 무음 체크 (RMS 에너지)
+        audio_rms = np.sqrt(np.mean(y**2))
+        print(f"  📊 Audio RMS energy: {audio_rms:.4f} (threshold: {STTConfig.SILENCE_RMS_THRESHOLD})")
+        if audio_rms < STTConfig.SILENCE_RMS_THRESHOLD:
+            print(f"  🔇 Audio too quiet. Returning empty result.")
+            processing_time = time.time() - start_time
+            return {
+                "text": "",
+                "audio_file": Path(audio_path).name,
+                "model": self.model_name,
+                "processing_time": round(processing_time, 2),
+                "audio_duration": round(audio_duration, 2),
+                "rtf": round(processing_time / max(audio_duration, 0.001), 4),
+                "num_speakers": 0
+            }
+
         # STT 수행 (ffmpeg 미설치 시 librosa로 대체 로딩)
         generate_kwargs = {
             "language": STTConfig.LANGUAGE,
@@ -110,11 +143,13 @@ class MedicalSTT:
         if self.vad_filter:
             print("  🎯 Using VAD filter (Voice Activity Detection)...")
 
-        # 노이즈 제거 전처리
+        # 노이즈 제거 전처리 (이미 로드된 오디오 사용)
         if self.noise_reduction:
-            audio_input = self._preprocess_audio(audio_path)
+            print("  🔧 Applying noise reduction...")
+            y = self._apply_noise_reduction(y, sr)
+            audio_input = {"array": np.asarray(y), "sampling_rate": sr}
         else:
-            audio_input = audio_path
+            audio_input = {"array": np.asarray(y), "sampling_rate": sr}
 
         try:
             result = self.transcriber(audio_input, generate_kwargs=generate_kwargs)
