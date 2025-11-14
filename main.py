@@ -21,8 +21,8 @@ def load_reference_text(args):
 
     TODO: 향후 의료 상담 평가 지표를 재정의할 때 이 함수와 관련 코드를 수정/삭제
     """
-    ref_text = args.ref_text
-    if not ref_text and args.ref_file:
+    ref_text = None
+    if args.ref_file:
         try:
             with open(args.ref_file, "r", encoding="utf-8") as rf:
                 ref_text = rf.read()
@@ -60,18 +60,14 @@ def main():
         default="data/output/transcripts.db",
         help="SQLite DB 파일 경로 (default: data/output/transcripts.db)"
     )
-    parser.add_argument(
-        "--ref-text",
-        type=str,
-        default=None,
-        help="평가용 참조 텍스트(주어지면 WER/CER 계산)"
-    )
+
     parser.add_argument(
         "--ref-file",
         type=str,
         default=None,
         help="평가용 참조 텍스트 파일 경로(UTF-8)"
     )
+    
     parser.add_argument(
         "--no-noise-reduction",
         action="store_true",
@@ -128,7 +124,11 @@ def main():
             # RTF 출력
             if result.get("audio_duration", 0) > 0:
                 print(f"\n⚡ Performance")
-                print(f"  RTF: {rtf_info['rtf']:.4f} (실시간보다 {rtf_info['speed_factor']:.2f}배 빠름)")
+                rtf_value = rtf_info['rtf']
+                if rtf_value <= 1.0:
+                    print(f"  RTF: {rtf_value:.4f} (실시간보다 {1/rtf_value:.2f}배 빠름)")
+                else:
+                    print(f"  RTF: {rtf_value:.4f} (실시간보다 {rtf_value:.2f}배 느림)")
                 print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {result.get('audio_duration', 0):.2f}초")
 
             # STT 품질 지표 계산 및 출력 (프로덕션 모니터링용)

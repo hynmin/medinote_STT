@@ -43,8 +43,13 @@ python main.py data/audio/consultation.mp3 --model fast      # 빠름 (기본값
 python main.py data/audio/consultation.mp3 --model balanced  # 균형
 python main.py data/audio/consultation.mp3 --model accurate  # 정확
 ```
+#### 평가 지표 확인 (개발/테스트용)
+```bash
+# 또는 참조 텍스트 파일 사용하여 WER/CER 확인
+python main.py data/audio/consultation.mp3 --ref-file data/reference.txt
+```
 
-#### CLI 녹음 (로컬 테스트용)
+#### 현재 녹음기능 : CLI 기반 녹음 (로컬 테스트용)
 ```bash
 python record.py
 ```
@@ -149,6 +154,7 @@ HF_TOKEN=your_huggingface_token_here
 pip uninstall torchcodec
 ```
 - transformers가 자동으로 librosa fallback 사용
+- 이후 화자분리 기능 구현시 pyannote, torchcodec설치
 
 ### "Invalid audio file path" 에러
 - 파일 경로를 절대 경로 또는 `data/audio/파일명.mp3` 형식으로 지정
@@ -164,16 +170,9 @@ pip uninstall torchcodec
 - CLI 녹음 기능(python record.py), `data/recordings/` 임시 저장
 
 ### 다음 단계
+- FastAPI 서버
+- SQLite -> postgreSQL 저장
+- React Native WebView + FastAPI 녹음 버튼 녹음 (JavaScript/HTML)
+- AWS S3 저장 연동
+- AWS EC2 배포
 
-#### 🎙️ 녹음 기능
-- **현재:**
-  - CLI 기반 녹음 (python record.py)
-  - **향후:** React Native WebView + FastAPI
-  - 버튼 클릭 녹음 (JavaScript/HTML)
-  - S3 음성파일 업로드
-
-#### ☁️ 인프라
-- [ ] AWS S3 연동 (오디오 파일 7일 보관)
-- [ ] FastAPI 서버 (녹음 → S3 → STT)
-- [ ] PostgreSQL 마이그레이션
-- [ ] AWS EC2 배포
