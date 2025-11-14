@@ -37,16 +37,35 @@ def init_db(db_path: str):
         """
     )
 
-    # STT 평가 지표 테이블 (개발/테스트용)
+    # 개발 평가 지표 테이블 (정답 스크립트 있을 때)
     cur.execute(
         """
-        CREATE TABLE IF NOT EXISTS STT_Metric (
+        CREATE TABLE IF NOT EXISTS Dev_Metrics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             transcript_id INTEGER NOT NULL,
             wer REAL,
             cer REAL,
             ref_chars INTEGER,
             hyp_chars INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(transcript_id) REFERENCES STT_Transcript(id)
+        )
+        """
+    )
+
+    # 관리 평가 지표 테이블 (프로덕션 모니터링)
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS STT_Metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            transcript_id INTEGER NOT NULL,
+            avg_confidence REAL,
+            min_confidence REAL,
+            low_confidence_ratio REAL,
+            silence_ratio REAL,
+            audio_rms_energy REAL,
+            clipping_detected INTEGER,
+            word_count INTEGER,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(transcript_id) REFERENCES STT_Transcript(id)
         )
@@ -101,15 +120,15 @@ def save_transcript(result: dict, processing_time: float, audio_duration: float,
     return tid
 
 
-def save_metrics(transcript_id: int, metrics: dict, db_path: str):
-    """STT_Metric 테이블에 저장."""
+def save_dev_metrics(transcript_id: int, metrics: dict, db_path: str):
+    """Dev_Metrics 테이블에 저장 (개발/테스트용)"""
     if not metrics:
         return
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     cur.execute(
         """
-        INSERT INTO STT_Metric (
+        INSERT INTO Dev_Metrics (
             transcript_id, wer, cer, ref_chars, hyp_chars
         ) VALUES (?, ?, ?, ?, ?)
         """,
@@ -119,6 +138,34 @@ def save_metrics(transcript_id: int, metrics: dict, db_path: str):
             float(metrics.get("cer", 0.0)),
             int(metrics.get("ref_chars", 0)),
             int(metrics.get("hyp_chars", 0)),
+        ),
+    )
+    con.commit()
+    con.close()
+
+
+def save_stt_metrics(transcript_id: int, metrics: dict, db_path: str):
+    """STT_Metrics 테이블에 저장 (프로덕션 모니터링용)"""
+    if not metrics:
+        return
+    con = sqlite3.connect(db_path)
+    cur = con.cursor()
+    cur.execute(
+        """
+        INSERT INTO STT_Metrics (
+            transcript_id, avg_confidence, min_confidence, low_confidence_ratio,
+            silence_ratio, audio_rms_energy, clipping_detected, word_count
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            transcript_id,
+            float(metrics.get("avg_confidence", 0.0)),
+            float(metrics.get("min_confidence", 0.0)),
+            float(metrics.get("low_confidence_ratio", 0.0)),
+            float(metrics.get("silence_ratio", 0.0)),
+            float(metrics.get("audio_rms_energy", 0.0)),
+            int(metrics.get("clipping_detected", 0)),
+            int(metrics.get("word_count", 0)),
         ),
     )
     con.commit()

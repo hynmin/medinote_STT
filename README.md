@@ -27,9 +27,7 @@ venv\Scripts\activate #Linux/Mac: source venv/bin/activate
 pip install -r requirements.txt
 
 # .env 파일 생성 (필수)
-# OpenAI API Key, HuggingFace Token 설정
 notepad .env  # Windows
-# 또는
 nano .env     # Linux/Mac
 ```
 
@@ -65,9 +63,7 @@ $ python main.py data/audio/consultation.mp3
 ==================================================
 📄 변환 결과:
 ==================================================
-어디가 불편하세요?
-목이 아프고 기침이 계속 나요.
-언제부터 그러셨나요?
+어디가 불편하세요? 목이 아프고 기침이 계속 나요.
 
 🗄️  Saved to DB: data/output/transcripts.db (transcript_id=1)
 
@@ -91,8 +87,6 @@ $ python main.py data/audio/consultation.mp3
   해열진통제, 기침억제제
 
 🏃 생활 관리:
-  - 충분한 휴식
-  - 수분 섭취
   - 따뜻한 물 자주 마시기
 
   ↳ 요약 생성 시간: 2.15초 (summary_id=1)
@@ -121,12 +115,13 @@ sound_to_text/
 ├── main.py              # CLI 실행
 ├── record.py            # 마이크 녹음 (로컬 테스트)
 ├── stt_engine.py        # STT 엔진 (Whisper)
-├── summary.py           # AI 요약 (GPT-4o-mini)
-├── storage.py           # SQLite 저장
-├── metrics.py           # 품질 평가
+├── stt_summary.py       # AI 요약 (GPT-4o-mini)
+├── db_storage.py        # DB 저장 (SQLite → PostgreSQL)
+├── dev_metrics.py       # 개발 평가지표 (WER/CER/RTF)
+├── stt_metrics.py       # 관리 평가지표 (Confidence, Audio Quality)
 ├── config.py            # 설정
 ├── requirements.txt
-├── .env                 # 환경 변수 (OpenAI API Key)
+├── .env                 # 환경 변수 (OpenAI API Key, HF Token)
 └── data/
     ├── audio/           # 테스트용 오디오 파일
     ├── recordings/      # 녹음 파일 (임시, 향후 S3)
@@ -166,18 +161,16 @@ pip uninstall torchcodec
 - AI 요약 (GPT-4o-mini)
 - SQLite 저장
 - 노이즈 제거 & 무음 감지
-- CLI 녹음 기능
+- CLI 녹음 기능(python record.py), `data/recordings/` 임시 저장
 
 ### 다음 단계
 
 #### 🎙️ 녹음 기능
-- **현재:** CLI 기반 녹음 (python record.py)
-  - 로컬 테스트용
-  - `data/recordings/` 임시 저장
-- **향후:** React Native WebView + FastAPI
-  - 버튼 클릭 녹음
-  - S3 직접 업로드
-  - JavaScript/HTML 추가
+- **현재:**
+  - CLI 기반 녹음 (python record.py)
+  - **향후:** React Native WebView + FastAPI
+  - 버튼 클릭 녹음 (JavaScript/HTML)
+  - S3 음성파일 업로드
 
 #### ☁️ 인프라
 - [ ] AWS S3 연동 (오디오 파일 7일 보관)

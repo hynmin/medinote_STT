@@ -1,5 +1,9 @@
 """
-평가지표 계산 유틸리티 (WER/CER/RTF)
+개발 평가지표 계산 유틸리티 (WER/CER/RTF)
+
+개발/테스트 단계에서 정답 스크립트가 있을 때 사용
+- compute_metrics: WER/CER 계산
+- compute_rtf: Real-Time Factor 계산
 """
 from jiwer import wer, cer
 

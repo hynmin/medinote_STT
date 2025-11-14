@@ -3,13 +3,11 @@ STT 엔진 핵심 로직
 """
 from transformers import pipeline
 import time
-import json
 from pathlib import Path
 from datetime import datetime
 from config import STTConfig
 import librosa
 import numpy as np
-import os
 
 
 class MedicalSTT:
@@ -34,13 +32,12 @@ class MedicalSTT:
         )
         print(f"✅ Model loaded successfully!")
     
-    def transcribe(self, audio_path, save_result=True, reference_text=None):
+    def transcribe(self, audio_path, reference_text=None):
         """
         오디오 파일을 텍스트로 변환
 
         Args:
             audio_path: 오디오 파일 경로
-            save_result: 결과를 JSON으로 저장할지 여부
             reference_text: 평가용 참조 텍스트 (제공 시 WER/CER 계산)
 
         Returns:
@@ -109,6 +106,12 @@ class MedicalSTT:
         # STT 수행 (librosa로 이미 로드했으므로 에러 복구 불필요)
         result = self.transcriber(audio_input, generate_kwargs=generate_kwargs)
 
+        # DEBUG: Whisper 결과 구조 확인
+        print(f"\n🔍 DEBUG - Whisper result keys: {result.keys()}")
+        if "chunks" in result and result["chunks"]:
+            print(f"🔍 DEBUG - First chunk sample: {result['chunks'][0]}")
+            print(f"🔍 DEBUG - Total chunks: {len(result['chunks'])}")
+
         processing_time = time.time() - start_time
 
         # 결과 정리
@@ -118,12 +121,13 @@ class MedicalSTT:
             "model": self.model_name,
             "processing_time": round(processing_time, 2),
             "audio_duration": round(audio_duration, 2),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "segments": result.get("chunks", [])  # Whisper segments 포함 (신뢰도 계산용)
         }
 
         # 평가 지표 계산 (옵션)
         if reference_text:
-            from metrics import compute_metrics
+            from dev_metrics import compute_metrics
             metrics = compute_metrics(reference_text, output["text"])
             output["metrics"] = metrics
             print(f"📐 WER: {metrics['wer']:.2%}, CER: {metrics['cer']:.2%}")
@@ -131,11 +135,17 @@ class MedicalSTT:
         print(f"✅ Done in {processing_time:.2f}s")
         print(f"📝 Result: {output['text'][:100]}...")
 
-        # 결과 저장
-        if save_result:
-            self._save_result(output)
-
         return output
+
+    def _get_audio_duration(self, audio_path):
+        """오디오 파일 길이를 초 단위로 반환"""
+        y, sr = librosa.load(audio_path, sr=None)
+        return librosa.get_duration(y=y, sr=sr)
+
+    def _apply_noise_reduction(self, y, sr):
+        """노이즈 제거 전처리"""
+        import noisereduce as nr
+        return nr.reduce_noise(y=y, sr=sr)
 
     def get_model_info(self):
         """모델 정보 반환"""
