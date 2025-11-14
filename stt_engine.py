@@ -13,15 +13,18 @@ import numpy as np
 class MedicalSTT:
     """의료 상담 음성을 텍스트로 변환하는 STT 엔진"""
 
-    def __init__(self, model_type="fast", noise_reduction=False):
+    def __init__(self, model_type="fast", noise_reduction=False, use_vad=False):
         """
         Args:
             model_type: "fast", "balanced", "accurate" 중 하나
             noise_reduction: 노이즈 제거 전처리 사용 여부
+            use_vad: VAD(Voice Activity Detection) 사용 여부
         """
         self.model_type = model_type
         self.model_name = STTConfig.get_model(model_type)
         self.noise_reduction = noise_reduction
+        self.use_vad = use_vad
+        self.vad_model = None
 
         print(f"🔄 Loading {self.model_name}...")
         self.transcriber = pipeline(
@@ -31,6 +34,10 @@ class MedicalSTT:
             return_timestamps=True
         )
         print(f"✅ Model loaded successfully!")
+
+        # VAD 모델 로드 (사용 시에만)
+        if self.use_vad:
+            self._load_vad_model()
     
     def transcribe(self, audio_path, reference_text=None):
         """
@@ -99,9 +106,13 @@ class MedicalSTT:
         if self.noise_reduction:
             print("  🔧 Applying noise reduction...")
             y = self._apply_noise_reduction(y, sr)
-            audio_input = {"array": np.asarray(y), "sampling_rate": sr}
-        else:
-            audio_input = {"array": np.asarray(y), "sampling_rate": sr}
+
+        # VAD 적용 (무음 구간 제거)
+        if self.use_vad:
+            print("  🎙️ Applying VAD (removing silence)...")
+            y = self._apply_vad(y, sr)
+
+        audio_input = {"array": np.asarray(y), "sampling_rate": sr}
 
         # STT 수행 (librosa로 이미 로드했으므로 에러 복구 불필요)
         result = self.transcriber(audio_input, generate_kwargs=generate_kwargs)
@@ -147,6 +158,69 @@ class MedicalSTT:
         import noisereduce as nr
         return nr.reduce_noise(y=y, sr=sr)
 
+    def _load_vad_model(self):
+        """Silero VAD 모델 로드"""
+        try:
+            import torch
+            print("  🔄 Loading Silero VAD model...")
+            self.vad_model, utils = torch.hub.load(
+                repo_or_dir='snakers4/silero-vad',
+                model='silero_vad',
+                force_reload=False,
+                onnx=False
+            )
+            self.get_speech_timestamps = utils[0]
+            print("  ✅ VAD model loaded successfully!")
+        except Exception as e:
+            print(f"  ⚠️ Failed to load VAD model: {e}")
+            self.use_vad = False
+            self.vad_model = None
+
+    def _apply_vad(self, y, sr):
+        """VAD를 적용하여 음성 구간만 추출"""
+        if self.vad_model is None:
+            return y
+
+        try:
+            import torch
+
+            # numpy array를 torch tensor로 변환
+            audio_tensor = torch.from_numpy(y).float()
+
+            # 음성 구간 감지
+            speech_timestamps = self.get_speech_timestamps(
+                audio_tensor,
+                self.vad_model,
+                sampling_rate=sr,
+                threshold=0.5,
+                min_speech_duration_ms=250,
+                min_silence_duration_ms=100
+            )
+
+            if not speech_timestamps:
+                print("  ⚠️ No speech detected by VAD, using original audio")
+                return y
+
+            # 음성 구간만 추출하여 연결
+            speech_segments = []
+            for segment in speech_timestamps:
+                start = segment['start']
+                end = segment['end']
+                speech_segments.append(y[start:end])
+
+            # 모든 음성 구간 연결
+            vad_audio = np.concatenate(speech_segments) if speech_segments else y
+
+            original_duration = len(y) / sr
+            vad_duration = len(vad_audio) / sr
+            print(f"  📊 VAD: {original_duration:.1f}s → {vad_duration:.1f}s ({(1 - vad_duration/original_duration)*100:.1f}% reduced)")
+
+            return vad_audio
+
+        except Exception as e:
+            print(f"  ⚠️ VAD failed: {e}, using original audio")
+            return y
+
     def get_model_info(self):
         """모델 정보 반환"""
         return {
@@ -154,7 +228,8 @@ class MedicalSTT:
             "model_name": self.model_name,
             "device": "GPU" if STTConfig.get_device() == 0 else "CPU",
             "language": STTConfig.LANGUAGE,
-            "noise_reduction": self.noise_reduction
+            "noise_reduction": self.noise_reduction,
+            "use_vad": self.use_vad
         }
 
 

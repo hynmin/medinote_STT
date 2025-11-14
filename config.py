@@ -24,8 +24,6 @@ class STTConfig:
 
     # 노이즈 처리 설정
     NOISE_REDUCTION = True  # 노이즈 제거 전처리 (noisereduce 필요)
-    VAD_FILTER = True  # Voice Activity Detection 필터
-    VAD_THRESHOLD = 0.5  # VAD 임계값 (0.0~1.0)
 
     # 무음/짧은 오디오 감지 설정 (환청 방지)
     MIN_AUDIO_DURATION = 1.0  # 최소 오디오 길이 (초)

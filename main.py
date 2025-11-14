@@ -77,12 +77,18 @@ def main():
         action="store_true",
         help="노이즈 제거 비활성화 (기본: 활성화)"
     )
+    parser.add_argument(
+        "--vad",
+        action="store_true",
+        help="VAD(Voice Activity Detection) 사용 - 무음 구간 제거"
+    )
     args = parser.parse_args()
 
     # STT 엔진 초기화
     stt = MedicalSTT(
         model_type=args.model,
-        noise_reduction=not args.no_noise_reduction
+        noise_reduction=not args.no_noise_reduction,
+        use_vad=args.vad
     )
 
     # DB 초기화 (기본적으로 활성화, --no-db로 비활성화 가능)
