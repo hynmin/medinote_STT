@@ -4,9 +4,8 @@ STT 실행 메인 파일
 import argparse
 from pathlib import Path
 from stt_engine import MedicalSTT
-from db_storage import init_db, save_transcript, save_dev_metrics, save_stt_metrics, save_summary
+from db_storage import init_db, save_transcript, save_summary
 from dev_metrics import compute_metrics, compute_rtf
-from stt_metrics import compute_stt_metrics
 from config import STTConfig
 from stt_summary import generate_summary
 from dotenv import load_dotenv
@@ -131,32 +130,6 @@ def main():
                     print(f"  RTF: {rtf_value:.4f} (실시간보다 {rtf_value:.2f}배 느림)")
                 print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {result.get('audio_duration', 0):.2f}초")
 
-            # STT 품질 지표 계산 및 출력 (프로덕션 모니터링용)
-            if result["text"].strip():
-                try:
-                    # Whisper의 segments 정보를 사용하여 신뢰도 계산
-                    stt_metrics = compute_stt_metrics(
-                        audio_path=str(audio_path),
-                        whisper_output={"segments": result.get("segments", [])},
-                        text=result["text"]
-                    )
-
-                    print(f"\n📊 STT 품질 지표 (프로덕션 모니터링)")
-                    print(f"  평균 신뢰도: {stt_metrics['avg_confidence']:.4f}")
-                    print(f"  최소 신뢰도: {stt_metrics['min_confidence']:.4f}")
-                    print(f"  낮은 신뢰도 비율: {stt_metrics['low_confidence_ratio']:.2%}")
-                    print(f"  무음 비율: {stt_metrics['silence_ratio']:.2%}")
-                    print(f"  오디오 RMS 에너지: {stt_metrics['audio_rms_energy']:.4f}")
-                    print(f"  클리핑 감지: {'예' if stt_metrics['clipping_detected'] else '아니오'}")
-                    print(f"  단어 수: {stt_metrics['word_count']}")
-
-                    # STT Metrics DB 저장
-                    save_stt_metrics(tid, stt_metrics, args.db_path)
-                    print("  ↳ STT Metrics saved to DB")
-
-                except Exception as e:
-                    print(f"⚠️  STT 품질 지표 계산 실패: {e}")
-
             # AI 요약 생성 (텍스트가 있을 때만)
             if result["text"].strip():
                 print("\n🤖 AI 요약 생성 중...")
@@ -202,10 +175,6 @@ def main():
             m = compute_metrics(ref_text, result.get("text", ""))
             print("\n📐 Metrics")
             print(f"  WER: {m['wer']:.4f}  CER: {m['cer']:.4f}")
-            if save_to_db:
-                # tid exists only if DB saving is enabled
-                save_dev_metrics(tid, m, args.db_path)
-                print("  ↳ saved to DB (dev_metrics)")
 
     else:
         print(f"❌ Invalid audio file path: {audio_path}")
