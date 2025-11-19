@@ -27,11 +27,12 @@ def init_db(db_path: str):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             audio_file TEXT,
             model TEXT,
-            text TEXT,
+            transcript_text TEXT,
             processing_time REAL,
             audio_duration REAL,
             rtf REAL,
             noise_reduction INTEGER,
+            s3_url TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
@@ -79,8 +80,7 @@ def init_db(db_path: str):
             transcript_id INTEGER NOT NULL,
             chief_complaint TEXT,
             diagnosis TEXT,
-            medication TEXT,
-            lifestyle_management TEXT,
+            recommendation TEXT,
             model TEXT,
             summary_time REAL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -100,7 +100,7 @@ def save_transcript(result: dict, processing_time: float, audio_duration: float,
     cur.execute(
         """
         INSERT INTO STT_Transcript (
-            audio_file, model, text, processing_time, audio_duration, rtf, noise_reduction, created_at
+            audio_file, model, transcript_text, processing_time, audio_duration, rtf, noise_reduction, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
@@ -176,8 +176,7 @@ def save_summary(
     transcript_id: int,
     chief_complaint: str,
     diagnosis: str,
-    medication: str,
-    lifestyle_management: str,
+    recommendation: str,
     model: str,
     summary_time: float,
     db_path: str
@@ -187,10 +186,9 @@ def save_summary(
 
     Args:
         transcript_id: STT_Transcript 테이블의 ID (외래키)
-        chief_complaint: 주요 증상
+        chief_complaint: 증상
         diagnosis: 진단
-        medication: 약물 처방
-        lifestyle_management: 생활 관리 및 재방문
+        recommendation: 권고사항
         model: 사용한 GPT 모델 (예: gpt-4o-mini)
         summary_time: 요약 생성 시간(초)
         db_path: DB 파일 경로
@@ -204,17 +202,15 @@ def save_summary(
     cur.execute(
         """
         INSERT INTO STT_Summary (
-            transcript_id, chief_complaint, diagnosis,
-            medication, lifestyle_management, model, summary_time
+            transcript_id, chief_complaint, diagnosis, recommendation, model, summary_time
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
         (
             transcript_id,
             chief_complaint,
             diagnosis,
-            medication,
-            lifestyle_management,
+            recommendation,
             model,
             float(summary_time) if summary_time is not None else None,
         ),

@@ -170,8 +170,7 @@ def main():
                         transcript_id=tid,
                         chief_complaint=summary_result["chief_complaint"],
                         diagnosis=summary_result["diagnosis"],
-                        medication=summary_result["medication"],
-                        lifestyle_management=summary_result["lifestyle_management"],
+                        recommendation=summary_result["recommendation"],
                         model=summary_result["model"],
                         summary_time=summary_result["summary_time"],
                         db_path=args.db_path
@@ -179,19 +178,17 @@ def main():
 
                     # 터미널에 요약 출력
                     print("\n" + "="*50)
-                    print("🤖 AI 요약")
+                    print("AI 요약")
                     print("="*50)
-                    print(f"\n📌 주요 증상:")
+                    print(f"\n  증상:")
                     print(f"  {summary_result['chief_complaint']}")
-                    print(f"\n🏥 진단:")
+                    print(f"\n  진단:")
                     print(f"  {summary_result['diagnosis']}")
-                    print(f"\n💊 약물 처방:")
-                    print(f"  {summary_result['medication']}")
-                    print(f"\n🏃 생활 관리:")
-                    for line in summary_result['lifestyle_management'].split('\n'):
+                    print(f"\n 소견:")
+                    for line in summary_result['recommendation'].split('\n'):
                         if line.strip():
-                            print(f"  - {line.strip()}")
-                    print(f"\n  ↳ 요약 생성 시간: {summary_result['summary_time']}초 (summary_id={summary_id})")
+                            print(line)
+                    print(f"\n 요약 생성 시간: {summary_result['summary_time']}초 (summary_id={summary_id})")
 
                 except Exception as e:
                     print(f"⚠️  AI 요약 생성 실패: {e}")

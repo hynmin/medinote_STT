@@ -20,10 +20,9 @@ def generate_summary(transcript_text: str, model: str = "gpt-4o-mini") -> dict:
 
     Returns:
         dict: {
-            "chief_complaint": "주요 증상",
+            "chief_complaint": "증상",
             "diagnosis": "진단",
-            "medication": "약물 처방",
-            "lifestyle_management": "생활 관리",
+            "recommendation": "권고사항",
             "model": "gpt-4o-mini",
             "summary_time": 1.23  # 초
         }
@@ -46,17 +45,14 @@ def generate_summary(transcript_text: str, model: str = "gpt-4o-mini") -> dict:
 
 다음 형식으로 정리해주세요. 각 섹션은 명확하게 구분하고, 해당 내용이 없으면 "없음"이라고 작성하세요:
 
-1. 주요 증상:
+1. 증상:
 (환자가 호소한 증상을 간결하게 정리)
 
 2. 진단:
-(의사의 진단명 또는 의학적 소견)
+(의사의 진단명 또는 추정 진단)
 
-3. 약물 처방:
-(처방된 약물명, 용량, 복용 방법. 약물이 언급되지 않으면 "없음")
-
-4. 생활 관리:
-(식이요법, 운동, 주의사항, 재방문 일정 등. 비약물적 권고사항)
+3. 권고사항:
+(처방된 약물명, 용량, 복용 방법. 식이요법, 운동, 권고사항, 주의사항, 재방문 일정 등)
 """
 
     # API 호출 시간 측정
@@ -78,14 +74,13 @@ def generate_summary(transcript_text: str, model: str = "gpt-4o-mini") -> dict:
         # GPT 응답 파싱
         content = response.choices[0].message.content.strip()
 
-        # 응답을 4개 섹션으로 분리
+        # 응답을 3개 섹션으로 분리
         sections = parse_summary_sections(content)
 
         return {
-            "chief_complaint": sections.get("주요 증상", ""),
+            "chief_complaint": sections.get("증상", ""),
             "diagnosis": sections.get("진단", ""),
-            "medication": sections.get("약물 처방", ""),
-            "lifestyle_management": sections.get("생활 관리", ""),
+            "recommendation": sections.get("권고사항", ""),
             "model": model,
             "summary_time": round(summary_time, 2)
         }
@@ -95,8 +90,7 @@ def generate_summary(transcript_text: str, model: str = "gpt-4o-mini") -> dict:
         return {
             "chief_complaint": "요약 생성 실패",
             "diagnosis": "요약 생성 실패",
-            "medication": "요약 생성 실패",
-            "lifestyle_management": "요약 생성 실패",
+            "recommendation": "요약 생성 실패",
             "model": model,
             "summary_time": 0.0
         }
@@ -104,13 +98,13 @@ def generate_summary(transcript_text: str, model: str = "gpt-4o-mini") -> dict:
 
 def parse_summary_sections(content: str) -> dict:
     """
-    GPT 응답을 4개 섹션으로 파싱
+    GPT 응답을 3개 섹션으로 파싱
 
     Args:
         content: GPT가 반환한 전체 텍스트
 
     Returns:
-        dict: {"주요 증상": "...", "진단": "...", ...}
+        dict: {"증상": "...", "진단": "...", ...}
     """
     sections = {}
     current_section = None
@@ -119,26 +113,21 @@ def parse_summary_sections(content: str) -> dict:
     for line in content.split('\n'):
         line = line.strip()
 
-        # 섹션 제목 감지 (1. 주요 증상:, 2. 진단: 등)
-        if line.startswith("1.") and "주요 증상" in line:
+        # 섹션 제목 감지 (1. 증상:, 2. 진단: 등)
+        if line.startswith("1.") and "증상" in line:
             if current_section and lines:
                 sections[current_section] = '\n'.join(lines).strip()
-            current_section = "주요 증상"
+            current_section = "증상"
             lines = []
         elif line.startswith("2.") and "진단" in line:
             if current_section and lines:
                 sections[current_section] = '\n'.join(lines).strip()
             current_section = "진단"
             lines = []
-        elif line.startswith("3.") and "약물 처방" in line:
+        elif line.startswith("3.") and "권고사항" in line:
             if current_section and lines:
                 sections[current_section] = '\n'.join(lines).strip()
-            current_section = "약물 처방"
-            lines = []
-        elif line.startswith("4.") and "생활 관리" in line:
-            if current_section and lines:
-                sections[current_section] = '\n'.join(lines).strip()
-            current_section = "생활 관리"
+            current_section = "권고사항"
             lines = []
         elif current_section and line:
             # 섹션 내용 수집
