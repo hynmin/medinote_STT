@@ -19,8 +19,9 @@ class STTConfig:
     DEVICE = "cuda" if os.getenv("USE_GPU", "false").lower() == "true" else "cpu"
 
     # 경로 설정
-    AUDIO_DIR = "data/audio"
-    OUTPUT_DIR = "data/output"
+    AUDIO_DIR = "data/audio" #현재 내부 경로. 나중에 S3 url로 대체
+    OUTPUT_DIR = "data/output"  # 로그, 리포트 등 출력 파일 저장
+    DB_PATH = "data/output/transcripts.db"
 
     # 노이즈 처리 설정
     NOISE_REDUCTION = True  # 노이즈 제거 전처리 (noisereduce 필요)

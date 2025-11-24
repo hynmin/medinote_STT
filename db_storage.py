@@ -69,6 +69,7 @@ def save_transcript(
     noise_reduction: bool,
     db_path: str,
     file_size: int = None,
+    s3_url: str = None,  # 프로덕션: S3 URL, 로컬 테스트: 로컬 경로
     stt_error: str = None
 ) -> int:
     """STT_Transcript 테이블에 저장하고 id 반환."""
@@ -78,8 +79,8 @@ def save_transcript(
         """
         INSERT INTO STT_Transcript (
             audio_file, model, transcript_text, processing_time, audio_duration, rtf,
-            file_size, noise_reduction, stt_error, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            file_size, noise_reduction, s3_url, stt_error, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             result.get("audio_file"),
@@ -90,11 +91,12 @@ def save_transcript(
             float(rtf) if rtf is not None else None,
             file_size,
             1 if noise_reduction else 0,
+            s3_url,
             stt_error,
             datetime.now().isoformat(),
         ),
     )
-    tid = cur.lastrowid
+    tid = cur.lastrowid #transcript id
     con.commit()
     con.close()
     return tid

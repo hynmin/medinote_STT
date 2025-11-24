@@ -3,7 +3,7 @@ STT 실행 메인 파일
 """
 import argparse
 from pathlib import Path
-from stt_engine import MedicalSTT
+from stt_engine import MedicalSTT, OpenAIWhisperSTT
 from db_storage import init_db, save_transcript, save_summary
 from dev_metrics import compute_metrics, compute_rtf
 from config import STTConfig
@@ -32,8 +32,8 @@ def load_reference_text(args):
 
 def main():
     parser = argparse.ArgumentParser(description="의료 상담 음성을 텍스트로 변환")
-    
-    parser.add_argument(
+
+    parser.add_argument( #cli 테스트용. data/audio/파일
         "audio_path",
         type=str,
         help="오디오 파일 경로 또는 디렉토리"
@@ -46,21 +46,8 @@ def main():
         default="fast",
         help="사용할 모델 (default: fast)"
     )
-    
-    parser.add_argument(
-        "--no-db",
-        action="store_true",
-        help="DB 저장 비활성화 (기본: DB에 저장)"
-    )
-    
-    parser.add_argument(
-        "--db-path",
-        type=str,
-        default="data/output/transcripts.db",
-        help="SQLite DB 파일 경로 (default: data/output/transcripts.db)"
-    )
 
-    parser.add_argument(
+    parser.add_argument( #개발단계 wer/cer 계산용
         "--ref-file",
         type=str,
         default=None,
@@ -72,24 +59,36 @@ def main():
         action="store_true",
         help="노이즈 제거 비활성화 (기본: 활성화)"
     )
+    
     parser.add_argument(
         "--vad",
         action="store_true",
         help="VAD(Voice Activity Detection) 사용 - 무음 구간 제거"
     )
+
+    parser.add_argument(
+        "--use-openai-api",
+        action="store_true",
+        help="OpenAI Whisper API 사용 (기본: 로컬 Hugging Face 모델)"
+    )
     args = parser.parse_args()
 
     # STT 엔진 초기화
-    stt = MedicalSTT(
-        model_type=args.model,
-        noise_reduction=not args.no_noise_reduction,
-        use_vad=args.vad
-    )
+    if args.use_openai_api:
+        # OpenAI API 사용
+        stt = OpenAIWhisperSTT()
+        print("🌐 Using OpenAI Whisper API")
+    else:
+        # 로컬 Hugging Face 모델 사용
+        stt = MedicalSTT(
+            model_type=args.model,
+            noise_reduction=not args.no_noise_reduction,
+            use_vad=args.vad
+        )
 
-    # DB 초기화 (기본적으로 활성화, --no-db로 비활성화 가능)
-    save_to_db = not args.no_db
-    if save_to_db:
-        init_db(args.db_path)
+    # DB 초기화
+    db_path = STTConfig.DB_PATH
+    init_db(db_path)
     
     audio_path = Path(args.audio_path)
     
@@ -105,20 +104,20 @@ def main():
         print("="*50)
         print(result["text"])
 
-        # DB 저장 (기본 활성화)
-        if save_to_db:
+        # DB 저장 구분 필요한지 확인 필요
+        if True:
             # RTF 계산
             rtf_info = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
 
             tid = save_transcript(
-                result,
+                result, # STT 결과 dict (audio_file, model, text 포함)
                 result.get("processing_time"),
                 result.get("audio_duration"),
                 rtf_info.get("rtf"),
                 not args.no_noise_reduction,
-                args.db_path
+                db_path
             )
-            print(f"🗄️  Saved to DB: {args.db_path} (transcript_id={tid})")
+            print(f"🗄️  Saved to DB: {db_path} (transcript_id={tid})")
 
             # RTF 출력
             if result.get("audio_duration", 0) > 0:
@@ -146,7 +145,7 @@ def main():
                         recommendation=summary_result["recommendation"],
                         model=summary_result["model"],
                         summary_time=summary_result["summary_time"],
-                        db_path=args.db_path
+                        db_path=db_path
                     )
 
                     # 터미널에 요약 출력

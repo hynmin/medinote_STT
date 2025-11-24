@@ -9,6 +9,8 @@ from config import STTConfig
 import librosa
 import numpy as np
 
+from openai import OpenAI
+import os
 
 class MedicalSTT:
     """의료 상담 음성을 텍스트로 변환하는 STT 엔진"""
@@ -117,12 +119,6 @@ class MedicalSTT:
         # STT 수행 (librosa로 이미 로드했으므로 에러 복구 불필요)
         result = self.transcriber(audio_input, generate_kwargs=generate_kwargs)
 
-        # DEBUG: Whisper 결과 구조 확인
-        print(f"\n🔍 DEBUG - Whisper result keys: {result.keys()}")
-        if "chunks" in result and result["chunks"]:
-            print(f"🔍 DEBUG - First chunk sample: {result['chunks'][0]}")
-            print(f"🔍 DEBUG - Total chunks: {len(result['chunks'])}")
-
         processing_time = time.time() - start_time
 
         # 결과 정리
@@ -144,7 +140,6 @@ class MedicalSTT:
             print(f"📐 WER: {metrics['wer']:.2%}, CER: {metrics['cer']:.2%}")
 
         print(f"✅ Done in {processing_time:.2f}s")
-        print(f"📝 Result: {output['text'][:100]}...")
 
         return output
 
@@ -230,6 +225,59 @@ class MedicalSTT:
             "language": STTConfig.LANGUAGE,
             "noise_reduction": self.noise_reduction,
             "use_vad": self.use_vad
+        }
+
+
+class OpenAIWhisperSTT:
+    """OpenAI Whisper API를 사용하는 STT 엔진"""
+    
+    def __init__(self, model="whisper-1"):
+        """
+        Args:
+            model: OpenAI Whisper 모델 (현재는 whisper-1만 제공)
+        """
+        self.model = model
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    def transcribe(self, audio_path):
+        """
+        오디오 파일을 OpenAI Whisper API로 변환
+        
+        Args:
+            audio_path: 오디오 파일 경로
+        
+        Returns:
+            dict: {
+                "text": 변환된 텍스트,
+                "audio_file": 파일명,
+                "model": "whisper-1",
+                "processing_time": 처리시간
+            }
+        """
+        import time
+        from pathlib import Path
+        
+        print(f"\n🎤 Processing with OpenAI Whisper API: {audio_path}")
+        start_time = time.time()
+        
+        # API 호출
+        with open(audio_path, "rb") as audio_file:
+            response = self.client.audio.transcriptions.create(
+                model=self.model,
+                file=audio_file,
+                language="ko",  # 한국어 지정
+                response_format="verbose_json"  # 상세 정보 포함
+            )
+        
+        processing_time = time.time() - start_time
+        
+        return {
+            "text": response.text,
+            "audio_file": Path(audio_path).name,
+            "model": f"openai/{self.model}",
+            "processing_time": round(processing_time, 2),
+            "audio_duration": response.duration if hasattr(response, 'duration') else None,
+            "timestamp": datetime.now().isoformat()
         }
 
 

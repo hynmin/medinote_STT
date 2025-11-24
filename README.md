@@ -89,7 +89,7 @@ $ python main.py data/audio/consultation.mp3
   상기도 감염 의심
 
 💊 권고사항:
-  해열진통제, 기침억제제 처방, 따뜻한 물 자주 마시기 권ㄱ고
+  해열진통제, 기침억제제 처방, 따뜻한 물 자주 마시기
 
   ↳ 요약 생성 시간: 2.15초 (summary_id=1)
 ```
@@ -120,7 +120,6 @@ sound_to_text/
 ├── stt_summary.py       # AI 요약 (GPT-4o-mini)
 ├── db_storage.py        # DB 저장 (SQLite → PostgreSQL)
 ├── dev_metrics.py       # 개발 평가지표 (WER/CER/RTF)
-├── stt_metrics.py       # 관리 평가지표 (Confidence, Audio Quality)
 ├── config.py            # 설정
 ├── requirements.txt
 ├── .env                 # 환경 변수 (OpenAI API Key, HF Token)
