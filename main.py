@@ -68,16 +68,20 @@ def main():
 
     parser.add_argument(
         "--use-openai-api",
-        action="store_true",
-        help="OpenAI Whisper API 사용 (기본: 로컬 Hugging Face 모델)"
+        type=str,
+        nargs="?",
+        const="whisper-1",
+        default=None,
+        choices=["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"],
+        help="OpenAI API 사용. 모델 선택: whisper-1(기본), gpt-4o-transcribe, gpt-4o-mini-transcribe"
     )
     args = parser.parse_args()
 
     # STT 엔진 초기화
     if args.use_openai_api:
         # OpenAI API 사용
-        stt = OpenAIWhisperSTT()
-        print("🌐 Using OpenAI Whisper API")
+        stt = OpenAIWhisperSTT(model=args.use_openai_api)
+        print(f"🌐 Using OpenAI API: {args.use_openai_api}")
     else:
         # 로컬 Hugging Face 모델 사용
         stt = MedicalSTT(
@@ -120,14 +124,18 @@ def main():
             print(f"🗄️  Saved to DB: {db_path} (transcript_id={tid})")
 
             # RTF 출력
-            if result.get("audio_duration", 0) > 0:
+            audio_duration = result.get("audio_duration")
+            if audio_duration and audio_duration > 0:
                 print(f"\n⚡ Performance")
                 rtf_value = rtf_info['rtf']
                 if rtf_value <= 1.0:
                     print(f"  RTF: {rtf_value:.4f} (실시간보다 {1/rtf_value:.2f}배 빠름)")
                 else:
                     print(f"  RTF: {rtf_value:.4f} (실시간보다 {rtf_value:.2f}배 느림)")
-                print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {result.get('audio_duration', 0):.2f}초")
+                print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {audio_duration:.2f}초")
+            else:
+                print(f"\n⚡ Performance")
+                print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 (RTF 계산 불가 - 오디오 길이 정보 없음)")
 
             # AI 요약 생성 (텍스트가 있을 때만)
             if result["text"].strip():

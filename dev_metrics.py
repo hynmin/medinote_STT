@@ -64,7 +64,7 @@ def compute_metrics(ref_text: str, hyp_text: str, remove_fillers=True) -> dict:
         ref = re.sub(punctuation, '', ref)
         hyp = re.sub(punctuation, '', hyp)
 
-        # 4. 한국어 추임새 제거
+        # 4. 한국어 추임새/감탄사 제거
         fillers = [
             r'\b음+\b',           # 음, 음음, 음음음
             r'\b으+[음응]\b',     # 으음, 으응, 으으음
@@ -74,6 +74,16 @@ def compute_metrics(ref_text: str, hyp_text: str, remove_fillers=True) -> dict:
             r'\b에+\b',           # 에, 에에
             r'\b그+\b',           # 그 (단독으로 쓰일 때)
             r'\b이+\b',           # 이 (단독으로 쓰일 때)
+            r'\b네+\b',           # 네, 네네
+            r'\b예+\b',           # 예, 예예
+            r'\b뭐+\b',           # 뭐, 뭐뭐
+            r'\b저+\b',           # 저 (단독으로 쓰일 때)
+            r'\b자+\b',           # 자 (단독으로 쓰일 때)
+            r'\b좀+\b',           # 좀
+            r'\b막+\b',           # 막
+            r'\b약간+\b',         # 약간
+            r'\b진짜+\b',         # 진짜
+            r'\b되게+\b',         # 되게
         ]
 
         for filler in fillers:
@@ -106,7 +116,7 @@ def compute_rtf(processing_time: float, audio_duration: float) -> dict:
 
     Returns: { 'rtf': float, 'speed_factor': float }
     """
-    if audio_duration <= 0:
+    if audio_duration is None or audio_duration <= 0:
         return {"rtf": 0.0, "speed_factor": 0.0}
 
     rtf = processing_time / audio_duration
