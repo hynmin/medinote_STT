@@ -19,7 +19,6 @@ data/output/*.json
 
 # 모델 캐시
 .cache/
-models/
 
 # IDE
 .vscode/
