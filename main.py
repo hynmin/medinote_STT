@@ -3,7 +3,8 @@ STT 실행 메인 파일
 """
 import argparse
 from pathlib import Path
-from models.stt.engine.whisper_engine import MedicalSTT, OpenAIWhisperSTT
+from models.stt.engine.hf_engine import HFWhisperSTT
+from models.stt.engine.openai_engine import OpenAIWhisperSTT
 from db.storage import init_db, save_transcript, save_summary
 from models.stt.utils.metrics import compute_metrics, compute_rtf
 from models.stt.core.config import STTConfig
@@ -17,8 +18,6 @@ load_dotenv()
 def load_reference_text(args):
     """
     평가용 참조 텍스트 로드
-
-    TODO: 향후 의료 상담 평가 지표를 재정의할 때 이 함수와 관련 코드를 수정/삭제
     """
     ref_text = None
     if args.ref_file:
@@ -42,8 +41,8 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        choices=["fast", "balanced", "accurate"],
-        default="fast",
+        choices=STTConfig.MODEL_CHOICES,
+        default=STTConfig.DEFAULT_MODEL,
         help="사용할 모델 (default: fast)"
     )
 
@@ -53,38 +52,27 @@ def main():
         default=None,
         help="평가용 참조 텍스트 파일 경로(UTF-8)"
     )
-    
     parser.add_argument(
         "--no-noise-reduction",
         action="store_true",
-        help="노이즈 제거 비활성화 (기본: 활성화)"
-    )
-    
-    parser.add_argument(
-        "--vad",
-        action="store_true",
-        help="VAD(Voice Activity Detection) 사용 - 무음 구간 제거"
+        help="노이즈 제거 비활성화 (기본: 활성화, HF 모델만 적용)"
     )
 
     parser.add_argument(
-        "--use-openai-api",
-        type=str,
-        nargs="?",
-        const="whisper-1",
-        default=None,
-        choices=["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"],
-        help="OpenAI API 사용. 모델 선택: whisper-1(기본), gpt-4o-transcribe, gpt-4o-mini-transcribe"
+        "--vad",
+        action="store_true",
+        help="VAD(Voice Activity Detection) 사용 (HF 모델만 적용)"
     )
     args = parser.parse_args()
 
     # STT 엔진 초기화
-    if args.use_openai_api:
-        # OpenAI API 사용
-        stt = OpenAIWhisperSTT(model=args.use_openai_api)
-        print(f"🌐 Using OpenAI API: {args.use_openai_api}")
+    if STTConfig.is_api_model(args.model):
+        # OpenAI API 모델
+        stt = OpenAIWhisperSTT(model=args.model)
+        print(f"Using OpenAI API: {args.model}")
     else:
-        # 로컬 Hugging Face 모델 사용
-        stt = MedicalSTT(
+        # HuggingFace 로컬 모델
+        stt = HFWhisperSTT(
             model_type=args.model,
             noise_reduction=not args.no_noise_reduction,
             use_vad=args.vad

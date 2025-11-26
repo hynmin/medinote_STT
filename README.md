@@ -35,15 +35,14 @@ nano .env     # Linux/Mac
 # STT 변환
 python main.py tests/sample_audio/consultation.mp3
 
-# 모델 선택 (로컬 Whisper)
+# 모델 선택
 python main.py tests/sample_audio/consultation.mp3 --model fast      # 빠름 (기본값)
 python main.py tests/sample_audio/consultation.mp3 --model balanced  # 균형
 python main.py tests/sample_audio/consultation.mp3 --model accurate  # 정확
 
-# OpenAI API 사용
-python main.py tests/sample_audio/consultation.mp3 --use-openai-api                      # whisper-1 (기본값)
-python main.py tests/sample_audio/consultation.mp3 --use-openai-api gpt-4o-transcribe    # gpt-4o
-python main.py tests/sample_audio/consultation.mp3 --use-openai-api gpt-4o-mini-transcribe  # gpt-4o-mini
+python main.py tests/sample_audio/consultation.mp3 --model whisper-1 
+python main.py tests/sample_audio/consultation.mp3 --model gpt-4o-transcribe    # gpt-4o
+python main.py tests/sample_audio/consultation.mp3 --model gpt-4o-mini-transcribe  # gpt-4o-mini
 
 ```
 
@@ -71,7 +70,8 @@ sound_to_text/
 │       ├── core/
 │       │   └── config.py
 │       ├── engine/
-│       │   └── whisper_engine.py
+│       │   ├── hf_engine.py
+│       │   └── openai_engine.py
 │       └── pipelines/
 │           └── summarize.py
 │       └── utils/
