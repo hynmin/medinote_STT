@@ -3,11 +3,11 @@ STT 실행 메인 파일
 """
 import argparse
 from pathlib import Path
-from stt_engine import MedicalSTT, OpenAIWhisperSTT
-from db_storage import init_db, save_transcript, save_summary
-from dev_metrics import compute_metrics, compute_rtf
-from config import STTConfig
-from stt_summary import generate_summary
+from models.stt.engine.whisper_engine import MedicalSTT, OpenAIWhisperSTT
+from db.storage import init_db, save_transcript, save_summary
+from models.stt.utils.metrics import compute_metrics, compute_rtf
+from models.stt.core.config import STTConfig
+from models.stt.pipelines.summarize import generate_summary
 from dotenv import load_dotenv
 
 # .env 파일 로드

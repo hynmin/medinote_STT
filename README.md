@@ -14,10 +14,8 @@
 - ☁️ **AWS 연동 준비**: S3 음성 파일 저장(7일), EC2 배포 예정
 
 
-## 🚀 빠른 시작
-
+## 시작
 ### 1. 설치
-
 ```bash
 # 가상환경 생성 (권장)
 python -m venv venv
@@ -32,115 +30,76 @@ nano .env     # Linux/Mac
 ```
 
 ### 2. 사용법
-
 #### 오디오 파일 변환
 ```bash
-# 단일 파일 변환
-python main.py data/audio/consultation.mp3
+# STT 변환
+python main.py tests/sample_audio/consultation.mp3
 
-# 모델 선택
-python main.py data/audio/consultation.mp3 --model fast      # 빠름 (기본값)
-python main.py data/audio/consultation.mp3 --model balanced  # 균형
-python main.py data/audio/consultation.mp3 --model accurate  # 정확
+# 모델 선택 (로컬 Whisper)
+python main.py tests/sample_audio/consultation.mp3 --model fast      # 빠름 (기본값)
+python main.py tests/sample_audio/consultation.mp3 --model balanced  # 균형
+python main.py tests/sample_audio/consultation.mp3 --model accurate  # 정확
+
+# OpenAI API 사용
+python main.py tests/sample_audio/consultation.mp3 --use-openai-api                      # whisper-1 (기본값)
+python main.py tests/sample_audio/consultation.mp3 --use-openai-api gpt-4o-transcribe    # gpt-4o
+python main.py tests/sample_audio/consultation.mp3 --use-openai-api gpt-4o-mini-transcribe  # gpt-4o-mini
+
 ```
+
 #### 평가 지표 확인 (개발/테스트용)
 ```bash
-# 또는 참조 텍스트 파일 사용하여 WER/CER 확인
-python main.py data/audio/consultation.mp3 --ref-file data/reference.txt
+# 참조 텍스트 파일 사용하여 WER/CER 확인
+python main.py tests/sample_audio/consultation.mp3 --ref-file tests/reference.txt
 ```
 
-#### 현재 녹음기능 : CLI 기반 녹음 (로컬 테스트용)
+#### CLI 기반 녹음 테스트용
 ```bash
-python record.py
-```
+python tests/test_record.py
 - Space: 녹음 시작/중지
 - Enter: STT 처리
 - q: 종료
-
-#### CLI 출력 예시
-```bash
-$ python main.py data/audio/consultation.mp3
-
-🎤 Processing: data/audio/consultation.mp3
-  📊 Audio RMS energy: 0.1234 (threshold: 0.05)
-  🔧 Applying noise reduction...
-
-==================================================
-📄 변환 결과:
-==================================================
-어디가 불편하세요? 목이 아프고 기침이 계속 나요.
-
-🗄️  Saved to DB: data/output/transcripts.db (transcript_id=1)
-
-⚡ Performance
-  RTF: 0.3214 (실시간보다 3.11배 빠름)
-  처리 시간: 8.30초 / 오디오 길이: 25.84초
-
-🤖 AI 요약 생성 중...
-
-==================================================
-🤖 AI 요약
-==================================================
-
-📌 증상:
-  목 통증, 지속적인 기침
-
-🏥 진단:
-  상기도 감염 의심
-
-💊 권고사항:
-  해열진통제, 기침억제제 처방, 따뜻한 물 자주 마시기
-
-  ↳ 요약 생성 시간: 2.15초 (summary_id=1)
-```
-
-
-### 3. 코드에서 사용
-
-```python
-from stt_engine import MedicalSTT
-
-# STT 엔진 초기화
-stt = MedicalSTT(model_type="fast")
-
-# 음성 변환
-result = stt.transcribe("audio.mp3")
-
-print(f"변환 텍스트: {result['text']}")
-print(f"처리 시간: {result['processing_time']}초")
 ```
 
 ## 📁 프로젝트 구조
-
-```
+```bash
 sound_to_text/
-├── main.py              # CLI 실행
-├── record.py            # 마이크 녹음 (로컬 테스트)
-├── stt_engine.py        # STT 엔진 (Whisper)
-├── stt_summary.py       # AI 요약 (GPT-4o-mini)
-├── db_storage.py        # DB 저장 (SQLite → PostgreSQL)
-├── dev_metrics.py       # 개발 평가지표 (WER/CER/RTF)
-├── config.py            # 설정
-├── requirements.txt
-├── .env                 # 환경 변수 (OpenAI API Key, HF Token)
-└── data/
-    ├── audio/           # 테스트용 오디오 파일
-    ├── recordings/      # 녹음 파일 (임시, 향후 S3)
-    ├── output/          # 변환 결과
-    │   └── transcripts.db  # SQLite 데이터베이스
-    └── reference.txt    # 평가용 참조 텍스트
+├── main.py
+├── dev_metrics.py
+├── models/
+│   └── stt/
+│       ├── core/
+│       │   └── config.py
+│       ├── engine/
+│       │   └── whisper_engine.py
+│       └── pipelines/
+│           └── summarize.py
+│       └── utils/
+│           └── metrics.py
+├── db/
+│   ├── storage.py
+│   └── transcripts.db
+├── temp/
+│   └── recordings/     ← 로컬 저장 (S3 업로드 후 삭제)
+│
+└── tests/
+    ├── test_record.py     # CLI 녹음 테스트 스크립트
+    ├── test_recordings/   ← CLI 녹음 테스트용
+    ├── sample_audio/      ← 테스트용 오디오
+    └── reference.txt      ← 평가용 참조 텍스트
 ```
 
 ## 🔧 환경 변수
 
+```bash
 프로젝트 루트에 `.env` 파일을 생성하세요:
 
-```bash
 # 필수: OpenAI API Key (AI 요약용)
 OPENAI_API_KEY=your_openai_api_key_here
 
 # 필수: HuggingFace Token (Whisper 모델 다운로드용)
 HF_TOKEN=your_huggingface_token_here
+
 ```
 
 ## ⚠️ 오류 해결
