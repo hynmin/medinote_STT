@@ -43,7 +43,6 @@ python main.py tests/sample_audio/consultation.mp3 --model accurate  # 정확
 python main.py tests/sample_audio/consultation.mp3 --model whisper-1 
 python main.py tests/sample_audio/consultation.mp3 --model gpt-4o-transcribe    # gpt-4o
 python main.py tests/sample_audio/consultation.mp3 --model gpt-4o-mini-transcribe  # gpt-4o-mini
-
 ```
 
 #### 평가 지표 확인 (개발/테스트용)
@@ -77,14 +76,12 @@ sound_to_text/
 │       └── utils/
 │           └── metrics.py
 ├── db/
-│   ├── storage.py
-│   └── transcripts.db
+│   └── storage.py
 ├── temp/
 │   └── recordings/     ← 로컬 저장 (S3 업로드 후 삭제)
-│
 └── tests/
-    ├── test_record.py     # CLI 녹음 테스트 스크립트
-    ├── test_recordings/   ← CLI 녹음 테스트용
+    ├── test_record.py     ← CLI 녹음 테스트
+    ├── test_recordings/   
     ├── sample_audio/      ← 테스트용 오디오
     └── reference.txt      ← 평가용 참조 텍스트
 ```
@@ -100,6 +97,8 @@ OPENAI_API_KEY=your_openai_api_key_here
 # 필수: HuggingFace Token (Whisper 모델 다운로드용)
 HF_TOKEN=your_huggingface_token_here
 
+# 필수: PostgreSQL Database URL
+DATABASE_URL=postgresql://유저:비밀번호@호스트:5432/DB이름
 ```
 
 ## ⚠️ 오류 해결
@@ -130,4 +129,40 @@ pip uninstall torchcodec
 - React Native WebView + FastAPI 녹음 버튼 녹음 (JavaScript/HTML)
 - AWS S3 저장 연동
 - AWS EC2 배포
+
+
+### 로직
+STT 로직
+[입력]
+1) 녹음 버튼을 누른다. 녹음완료버튼을 누르면 모바일에 mp3파일이 생성된다. 
+2) 녹음파일(mp3, m4a)을 업로드하는 버튼을 통해 파일 업로드한다
+
+[로컬 임시 저장]
+로컬에 임시 파일 저장 (data/temp/20250101_123321_recordingmp3)
+
+[DB 생성]
+STT_Transcript테이블에 레코드 생성, 
+audio_file(로컬경로), status='pending', s3=null
+transcript_id 반환
+
+[S3업로드]
+→S3_url 업데이트
+→status='S3_uploaded'
+→로컬 임시파일 삭제 
+
+→ 실패시 stautus = 'S3_failed'
+→ stt_error 기록
+→ 로컬 파일 유지
+→ 백그라운드에서 S3 업로드 재시도 (attempts +=1 업데이트, 제한 3회)
+→ 재시도 성공 : S3_url업데이트, status='S3_uploaded', 로컬 삭제
+→ 재시도 실패 : status='S3_failed'
+
+[STT 처리]
+S3_url로 파일 읽어서 stt.transcribe() 실행. result["text"] 생성
+→ STT_Transcript에 transcript_text 저장, processing_time, audio_duration, rtf 저장
+→ status 업데이트 (transcribed)
+→ STT_Metrics 저장 (transcript_id 참조)
+→ generate_summary() 실행 → STT_Summary 저장,
+→ status 업데이트 (completed)
+
 

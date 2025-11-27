@@ -73,7 +73,7 @@ def main():
     else:
         # HuggingFace 로컬 모델
         stt = HFWhisperSTT(
-            model_type=args.model,
+            model=args.model,
             noise_reduction=not args.no_noise_reduction,
             use_vad=args.vad
         )
@@ -99,13 +99,13 @@ def main():
         # DB 저장 구분 필요한지 확인 필요
         if True:
             # RTF 계산
-            rtf_info = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
+            rtf = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
 
             tid = save_transcript(
                 result, # STT 결과 dict (audio_file, model, text 포함)
                 result.get("processing_time"),
                 result.get("audio_duration"),
-                rtf_info.get("rtf"),
+                rtf,
                 not args.no_noise_reduction,
                 db_path
             )
@@ -115,7 +115,7 @@ def main():
             audio_duration = result.get("audio_duration")
             if audio_duration and audio_duration > 0:
                 print(f"\n⚡ Performance")
-                rtf_value = rtf_info['rtf']
+                rtf_value = rtf
                 if rtf_value <= 1.0:
                     print(f"  RTF: {rtf_value:.4f} (실시간보다 {1/rtf_value:.2f}배 빠름)")
                 else:
@@ -170,6 +170,7 @@ def main():
             m = compute_metrics(ref_text, result.get("text", ""))
             print("\n📐 Metrics")
             print(f"  WER: {m['wer']:.4f}  CER: {m['cer']:.4f}")
+            print(f"  참조 글자수: {m['ref_chars']}  인식 글자수: {m['hyp_chars']}")
 
     else:
         print(f"❌ Invalid audio file path: {audio_path}")

@@ -8,3 +8,4 @@ noisereduce>=3.0.0
 openai>=1.0.0
 python-dotenv>=1.0.0
 sounddevice>=0.4.6
+psycopg2-binary>=2.9.0

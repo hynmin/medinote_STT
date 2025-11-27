@@ -39,7 +39,7 @@ class STTConfig:
 
     # Silence/short audio thresholds
     MIN_AUDIO_DURATION = 1.0
-    SILENCE_RMS_THRESHOLD = 0.05
+    SILENCE_RMS_THRESHOLD = 0.01
 
     # Initial prompt for Whisper
     INITIAL_PROMPT = "의료 상담 음성입니다. 의료종사자와 환자 대화입니다."

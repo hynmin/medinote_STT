@@ -12,15 +12,15 @@ from models.stt.utils.metrics import compute_metrics
 
 
 class HFWhisperSTT:
-    def __init__(self, model_type="fast", noise_reduction=False, use_vad=False):
+    def __init__(self, model="fast", noise_reduction=False, use_vad=False):
         """
         Args:
-            model_type: "fast", "balanced", "accurate" 중 하나
+            model: "fast", "balanced", "accurate" 중 하나
             noise_reduction: 노이즈 제거 전처리 사용 여부
             use_vad: VAD(Voice Activity Detection) 사용 여부
         """
-        self.model_type = model_type
-        self.model_name = STTConfig.get_model(model_type)
+        self.model = model
+        self.model_name = STTConfig.get_model(model)
         self.noise_reduction = noise_reduction
         self.use_vad = use_vad
         self.vad_model = None
@@ -213,7 +213,7 @@ class HFWhisperSTT:
     def get_model_info(self):
         """모델 정보 반환"""
         return {
-            "model_type": self.model_type,
+            "model": self.model,
             "model_name": self.model_name,
             "device": "GPU" if STTConfig.get_device() == 0 else "CPU",
             "language": STTConfig.LANGUAGE,
