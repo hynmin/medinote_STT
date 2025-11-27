@@ -3,9 +3,17 @@ OpenAI Whisper API STT 엔진
 """
 import os
 import time
+import tempfile
 from pathlib import Path
 from datetime import datetime
 from openai import OpenAI
+from pydub import AudioSegment
+
+
+# OpenAI API 파일 크기 제한 (25MB)
+MAX_FILE_SIZE = 25 * 1024 * 1024
+# 청크 길이 (10분 = 600초 = 600,000ms)
+CHUNK_LENGTH_MS = 10 * 60 * 1000
 
 
 class OpenAIWhisperSTT:
@@ -20,6 +28,7 @@ class OpenAIWhisperSTT:
     def transcribe(self, audio_path):
         """
         오디오 파일을 OpenAI Whisper API로 변환
+        25MB 초과 시 10분 단위로 분할 처리
 
         Args:
             audio_path: 오디오 파일 경로
@@ -29,38 +38,45 @@ class OpenAIWhisperSTT:
                 "text": 변환된 텍스트,
                 "audio_file": 파일명,
                 "model": 모델명,
-                "processing_time": 처리시간
+                "processing_time": 처리시간,
+                "audio_duration": 오디오 길이
             }
         """
+        file_size = os.path.getsize(audio_path)
+
+        if file_size <= MAX_FILE_SIZE:
+            return self._transcribe_single(audio_path)
+        else:
+            print(f"  File size ({file_size / 1024 / 1024:.1f}MB) exceeds 25MB limit. Splitting into chunks...")
+            return self._transcribe_chunked(audio_path)
+
+    def _transcribe_single(self, audio_path):
+        """단일 파일 STT 처리 (25MB 이하)"""
         print(f"\nProcessing with OpenAI API: {audio_path}")
         start_time = time.time()
 
         # 모델별 response_format 설정
-        # gpt-4o-transcribe 모델들은 verbose_json 미지원
         if self.model.startswith("gpt-4o"):
             response_format = "json"
         else:
             response_format = "verbose_json"
 
-        # API 호출
         with open(audio_path, "rb") as audio_file:
             response = self.client.audio.transcriptions.create(
                 model=self.model,
                 file=audio_file,
-                language="ko",  # 한국어 지정
+                language="ko",
                 response_format=response_format
             )
 
         processing_time = time.time() - start_time
 
-        # response_format에 따른 결과 파싱
         if response_format == "verbose_json":
             text = response.text
             audio_duration = response.duration if hasattr(response, 'duration') else None
         else:
-            # json 포맷은 dict 형태
             text = response.text if hasattr(response, 'text') else response.get("text", "")
-            audio_duration = None  # json 포맷은 duration 미제공
+            audio_duration = None
 
         return {
             "text": text,
@@ -68,6 +84,93 @@ class OpenAIWhisperSTT:
             "model": f"openai/{self.model}",
             "processing_time": round(processing_time, 2),
             "audio_duration": audio_duration,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    def _transcribe_chunked(self, audio_path):
+        """청크 분할 STT 처리 (25MB 초과)"""
+        print(f"\nProcessing with OpenAI API (chunked): {audio_path}")
+        start_time = time.time()
+
+        # 오디오 로드
+        file_ext = Path(audio_path).suffix.lower()
+        if file_ext == ".mp3":
+            audio = AudioSegment.from_mp3(audio_path)
+        elif file_ext == ".m4a":
+            audio = AudioSegment.from_file(audio_path, format="m4a")
+        elif file_ext == ".wav":
+            audio = AudioSegment.from_wav(audio_path)
+        else:
+            audio = AudioSegment.from_file(audio_path)
+
+        audio_duration_sec = len(audio) / 1000  # 밀리초 → 초
+
+        # 10분 단위로 분할
+        chunks = []
+        for i in range(0, len(audio), CHUNK_LENGTH_MS):
+            chunk = audio[i:i + CHUNK_LENGTH_MS]
+            chunks.append(chunk)
+
+        print(f"  Split into {len(chunks)} chunks ({CHUNK_LENGTH_MS // 60000} min each)")
+
+        # 각 청크 STT 처리
+        all_texts = []
+        temp_files = []
+
+        try:
+            for idx, chunk in enumerate(chunks):
+                # 임시 파일 생성
+                temp_file = tempfile.NamedTemporaryFile(
+                    suffix=".mp3",
+                    delete=False
+                )
+                temp_path = temp_file.name
+                temp_file.close()
+                temp_files.append(temp_path)
+
+                # 청크 저장
+                chunk.export(temp_path, format="mp3")
+
+                print(f"  Processing chunk {idx + 1}/{len(chunks)}...")
+
+                # API 호출
+                if self.model.startswith("gpt-4o"):
+                    response_format = "json"
+                else:
+                    response_format = "verbose_json"
+
+                with open(temp_path, "rb") as audio_file:
+                    response = self.client.audio.transcriptions.create(
+                        model=self.model,
+                        file=audio_file,
+                        language="ko",
+                        response_format=response_format
+                    )
+
+                if response_format == "verbose_json":
+                    text = response.text
+                else:
+                    text = response.text if hasattr(response, 'text') else response.get("text", "")
+
+                all_texts.append(text)
+
+        finally:
+            # 임시 파일 삭제
+            for temp_path in temp_files:
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+
+        processing_time = time.time() - start_time
+        combined_text = " ".join(all_texts)
+
+        return {
+            "text": combined_text,
+            "audio_file": Path(audio_path).name,
+            "model": f"openai/{self.model}",
+            "processing_time": round(processing_time, 2),
+            "audio_duration": round(audio_duration_sec, 2),
             "timestamp": datetime.now().isoformat()
         }
 
