@@ -36,36 +36,34 @@ def main():
         "audio_path",
         type=str,
         help="오디오 파일 경로 또는 디렉토리"
-    )
-    
-    parser.add_argument(
+    )  
+    parser.add_argument( #모델 선택
         "--model",
         type=str,
         choices=STTConfig.MODEL_CHOICES,
         default=STTConfig.DEFAULT_MODEL,
         help="사용할 모델 (default: fast)"
     )
-
     parser.add_argument( #개발단계 wer/cer 계산용
         "--ref-file",
         type=str,
         default=None,
         help="평가용 참조 텍스트 파일 경로(UTF-8)"
     )
-    parser.add_argument(
+    parser.add_argument( #노이즈 제거
         "--no-noise-reduction",
         action="store_true",
         help="노이즈 제거 비활성화 (기본: 활성화, HF 모델만 적용)"
     )
-
-    parser.add_argument(
+    parser.add_argument( #음성활동감지
         "--vad",
         action="store_true",
         help="VAD(Voice Activity Detection) 사용 (HF 모델만 적용)"
     )
+
     args = parser.parse_args()
 
-    # STT 엔진 초기화
+    # STT 엔진 선택
     if STTConfig.is_api_model(args.model):
         # OpenAI API 모델
         stt = OpenAIWhisperSTT(model=args.model)
@@ -78,15 +76,15 @@ def main():
             use_vad=args.vad
         )
 
-    # DB 초기화
+    # 테이블 없으면 생성
     db_path = STTConfig.DB_PATH
     init_db(db_path)
     
     audio_path = Path(args.audio_path)
     
-    # 단일 파일 처리
-    if audio_path.is_file():
-        result = stt.transcribe(
+    # 음성파일 STT 처리
+    if audio_path.is_file(): 
+        result = stt.transcribe(   # 음성파일 STT 처리
             str(audio_path),
         )
 
@@ -96,75 +94,72 @@ def main():
         print("="*50)
         print(result["text"])
 
-        # DB 저장 구분 필요한지 확인 필요
-        if True:
-            # RTF 계산
-            rtf = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
+        # RTF 계산 및 cli 출력
+        rtf = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
+        audio_duration = result.get("audio_duration")
+        file_size_mb = audio_path.stat().st_size / (1024 * 1024)  # bytes to MB
 
-            tid = save_transcript(
-                result, # STT 결과 dict (audio_file, model, text 포함)
-                result.get("processing_time"),
-                result.get("audio_duration"),
-                rtf,
-                not args.no_noise_reduction,
-                db_path
-            )
-            print(f"🗄️  Saved to DB: {db_path} (transcript_id={tid})")
-
-            # RTF 출력
-            audio_duration = result.get("audio_duration")
-            if audio_duration and audio_duration > 0:
-                print(f"\n⚡ Performance")
-                rtf_value = rtf
-                if rtf_value <= 1.0:
-                    print(f"  RTF: {rtf_value:.4f} (실시간보다 {1/rtf_value:.2f}배 빠름)")
-                else:
-                    print(f"  RTF: {rtf_value:.4f} (실시간보다 {rtf_value:.2f}배 느림)")
-                print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {audio_duration:.2f}초")
+        print(f"\n⚡ Performance")
+        print(f"  파일 크기: {file_size_mb:.2f} MB")
+        if audio_duration and audio_duration > 0:
+            if rtf <= 1.0:
+                print(f"  RTF: {rtf:.4f} (실시간보다 {1/rtf:.2f}배 빠름)")
             else:
-                print(f"\n⚡ Performance")
-                print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 (RTF 계산 불가 - 오디오 길이 정보 없음)")
+                print(f"  RTF: {rtf:.4f} (실시간보다 {rtf:.2f}배 느림)")
+            print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {audio_duration:.2f}초")
+        else:
+            print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 (RTF 계산 불가 - 오디오 길이 정보 없음)")
 
-            # AI 요약 생성 (텍스트가 있을 때만)
-            if result["text"].strip():
-                print("\n🤖 AI 요약 생성 중...")
-                try:
-                    summary_result = generate_summary(
-                        transcript_text=result["text"],
-                        model="gpt-4o-mini"
-                    )
+        # STT 결과 DB저장
+        tid = save_transcript(
+            result,
+            result.get("processing_time"),
+            result.get("audio_duration"),
+            rtf,
+            not args.no_noise_reduction,
+            db_path
+        )
+        print(f"🗄️  Saved to DB: {db_path} (transcript_id={tid})")
 
-                    summary_id = save_summary(
-                        transcript_id=tid,
-                        chief_complaint=summary_result["chief_complaint"],
-                        diagnosis=summary_result["diagnosis"],
-                        recommendation=summary_result["recommendation"],
-                        model=summary_result["model"],
-                        summary_time=summary_result["summary_time"],
-                        db_path=db_path
-                    )
+        # AI 요약 생성
+        if result["text"].strip():
+            print("\n🤖 AI 요약 생성 중...")
+            try:
+                summary_result = generate_summary(  # 요약정리 생성
+                    transcript_text=result["text"],
+                    model="gpt-4o-mini"
+                )
 
-                    # 터미널에 요약 출력
-                    print("\n" + "="*50)
-                    print("AI 요약")
-                    print("="*50)
-                    print(f"\n  증상:")
-                    print(f"  {summary_result['chief_complaint']}")
-                    print(f"\n  진단:")
-                    print(f"  {summary_result['diagnosis']}")
-                    print(f"\n 소견:")
-                    for line in summary_result['recommendation'].split('\n'):
-                        if line.strip():
-                            print(line)
-                    print(f"\n 요약 생성 시간: {summary_result['summary_time']}초 (summary_id={summary_id})")
+                summary_id = save_summary(          # 요약정리 DB 저장
+                    transcript_id=tid,
+                    chief_complaint=summary_result["chief_complaint"],
+                    diagnosis=summary_result["diagnosis"],
+                    recommendation=summary_result["recommendation"],
+                    model=summary_result["model"],
+                    summary_time=summary_result["summary_time"],
+                    db_path=db_path
+                )
 
-                except Exception as e:
-                    print(f"⚠️  AI 요약 생성 실패: {e}")
-            else:
-                print("\n⏭️  텍스트가 비어있어 AI 요약을 건너뜁니다.")
+                # 터미널에 요약 출력
+                print("\n" + "="*50)
+                print("AI 요약")
+                print("="*50)
+                print(f"\n  증상:")
+                print(f"  {summary_result['chief_complaint']}")
+                print(f"\n  진단:")
+                print(f"  {summary_result['diagnosis']}")
+                print(f"\n 소견:")
+                for line in summary_result['recommendation'].split('\n'):
+                    if line.strip():
+                        print(line)
+                print(f"\n 요약 생성 시간: {summary_result['summary_time']}초 (summary_id={summary_id})")
 
-        # 평가지표 계산/출력/저장 (옵션)
-        # TODO: 향후 의료 상담 평가 지표를 재정의할 때 이 블록을 수정/삭제
+            except Exception as e:
+                print(f"⚠️  AI 요약 생성 실패: {e}")
+        else:
+            print("\n⏭️  텍스트가 비어있어 AI 요약을 건너뜁니다.")
+
+        # 평가지표 cli 출력 (개발단계)
         ref_text = load_reference_text(args)
         if ref_text:
             m = compute_metrics(ref_text, result.get("text", ""))

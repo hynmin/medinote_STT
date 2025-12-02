@@ -8,10 +8,12 @@ from pathlib import Path
 from datetime import datetime
 from openai import OpenAI
 from pydub import AudioSegment
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-# OpenAI API 파일 크기 제한 (25MB)
-MAX_FILE_SIZE = 25 * 1024 * 1024
+# 파일 크기 제한
+MAX_FILE_SIZE = 25 * 1024 * 1024      # OpenAI API 제한 (25MB) - 초과 시 청크 분할
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024   # 업로드 제한 (100MB) - 초과 시 거부
 # 청크 길이 (10분 = 600초 = 600,000ms)
 CHUNK_LENGTH_MS = 10 * 60 * 1000
 
@@ -43,6 +45,10 @@ class OpenAIWhisperSTT:
             }
         """
         file_size = os.path.getsize(audio_path)
+
+        # 100MB 초과 시 거부
+        if file_size > MAX_UPLOAD_SIZE:
+            raise ValueError(f"파일 크기({file_size / 1024 / 1024:.1f}MB)가 100MB 제한을 초과했습니다.")
 
         if file_size <= MAX_FILE_SIZE:
             return self._transcribe_single(audio_path)
@@ -87,6 +93,47 @@ class OpenAIWhisperSTT:
             "timestamp": datetime.now().isoformat()
         }
 
+    def _process_single_chunk(self, args):
+        """단일 청크 STT 처리 (병렬용)"""
+        idx, chunk, total = args
+
+        # 임시 파일 생성
+        temp_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+        temp_path = temp_file.name
+        temp_file.close()
+
+        try:
+            # 청크 저장
+            chunk.export(temp_path, format="mp3")
+            print(f"  Processing chunk {idx + 1}/{total}...")
+
+            # API 호출
+            if self.model.startswith("gpt-4o"):
+                response_format = "json"
+            else:
+                response_format = "verbose_json"
+
+            with open(temp_path, "rb") as audio_file:
+                response = self.client.audio.transcriptions.create(
+                    model=self.model,
+                    file=audio_file,
+                    language="ko",
+                    response_format=response_format
+                )
+
+            if response_format == "verbose_json":
+                text = response.text
+            else:
+                text = response.text if hasattr(response, 'text') else response.get("text", "")
+
+            return idx, text
+        finally:
+            # 임시 파일 삭제
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+
     def _transcribe_chunked(self, audio_path):
         """청크 분할 STT 처리 (25MB 초과)"""
         print(f"\nProcessing with OpenAI API (chunked): {audio_path}")
@@ -113,54 +160,19 @@ class OpenAIWhisperSTT:
 
         print(f"  Split into {len(chunks)} chunks ({CHUNK_LENGTH_MS // 60000} min each)")
 
-        # 각 청크 STT 처리
-        all_texts = []
-        temp_files = []
+        # STT 처리 (병렬 처리)
+        chunk_args = [(idx, chunk, len(chunks)) for idx, chunk in enumerate(chunks)]
 
-        try:
-            for idx, chunk in enumerate(chunks):
-                # 임시 파일 생성
-                temp_file = tempfile.NamedTemporaryFile(
-                    suffix=".mp3",
-                    delete=False
-                )
-                temp_path = temp_file.name
-                temp_file.close()
-                temp_files.append(temp_path)
+        results = {}
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(self._process_single_chunk, arg): arg[0] for arg in chunk_args}
 
-                # 청크 저장
-                chunk.export(temp_path, format="mp3")
+            for future in as_completed(futures):
+                idx, text = future.result()
+                results[idx] = text
 
-                print(f"  Processing chunk {idx + 1}/{len(chunks)}...")
-
-                # API 호출
-                if self.model.startswith("gpt-4o"):
-                    response_format = "json"
-                else:
-                    response_format = "verbose_json"
-
-                with open(temp_path, "rb") as audio_file:
-                    response = self.client.audio.transcriptions.create(
-                        model=self.model,
-                        file=audio_file,
-                        language="ko",
-                        response_format=response_format
-                    )
-
-                if response_format == "verbose_json":
-                    text = response.text
-                else:
-                    text = response.text if hasattr(response, 'text') else response.get("text", "")
-
-                all_texts.append(text)
-
-        finally:
-            # 임시 파일 삭제
-            for temp_path in temp_files:
-                try:
-                    os.unlink(temp_path)
-                except:
-                    pass
+        # 순서대로 합침
+        all_texts = [results[i] for i in range(len(chunks))]
 
         processing_time = time.time() - start_time
         combined_text = " ".join(all_texts)

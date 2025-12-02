@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.env
+*.db
+tests/sample_audio/
+tests/test_recordings/
+temp/

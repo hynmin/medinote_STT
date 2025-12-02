@@ -63,7 +63,6 @@ python tests/test_record.py
 ```bash
 sound_to_text/
 ├── main.py
-├── dev_metrics.py
 ├── models/
 │   └── stt/
 │       ├── core/
@@ -78,10 +77,10 @@ sound_to_text/
 ├── db/
 │   └── storage.py
 ├── temp/
-│   └── recordings/     ← 로컬 저장 (S3 업로드 후 삭제)
+│   └── recordings/     ← React 연동시 파일 임시 저장 (S3 업로드 후 삭제)
 └── tests/
     ├── test_record.py     ← CLI 녹음 테스트
-    ├── test_recordings/   
+    ├── test_recordings/   ← CLI 녹음시 파일 저장(개발)
     ├── sample_audio/      ← 테스트용 오디오
     └── reference.txt      ← 평가용 참조 텍스트
 ```
@@ -117,7 +116,7 @@ pip uninstall torchcodec
 ## 🗺️ 로드맵
 
 ### ✅ 현재 (로컬 개발)
-- STT 엔진 (Whisper)
+- STT 엔진 (HF / openAI)
 - AI 요약 (GPT-4o-mini)
 - SQLite 저장
 - 노이즈 제거 & 무음 감지
@@ -142,27 +141,18 @@ STT 로직
 
 [DB 생성]
 STT_Transcript테이블에 레코드 생성, 
-audio_file(로컬경로), status='pending', s3=null
+audio_file(로컬경로), stt_status='pending'
 transcript_id 반환
 
-[S3업로드]
-→S3_url 업데이트
-→status='S3_uploaded'
-→로컬 임시파일 삭제 
-
-→ 실패시 stautus = 'S3_failed'
-→ stt_error 기록
-→ 로컬 파일 유지
-→ 백그라운드에서 S3 업로드 재시도 (attempts +=1 업데이트, 제한 3회)
-→ 재시도 성공 : S3_url업데이트, status='S3_uploaded', 로컬 삭제
-→ 재시도 실패 : status='S3_failed'
-
-[STT 처리]
-S3_url로 파일 읽어서 stt.transcribe() 실행. result["text"] 생성
+[STT처리 & S3 업로드 병렬 처리]
+1) STT 처리
+로컬 파일 읽어서 stt.transcribe() 실행. result["text"] 생성
 → STT_Transcript에 transcript_text 저장, processing_time, audio_duration, rtf 저장
-→ status 업데이트 (transcribed)
 → STT_Metrics 저장 (transcript_id 참조)
+→ stt_status = 'trascribed' 업데이트
 → generate_summary() 실행 → STT_Summary 저장,
-→ status 업데이트 (completed)
+→ stt_status = 'completed' 업데이트
 
-
+2) S3업로드
+→ S3 업로드 성공 : S3_url 저장, S3_status='S3_uploaded' & 로컬 임시파일 삭제 
+→ S3 업로드 실패 : S3_stautus = 'S3_failed' (로컬 파일 유지, 백그라운드 재시도 attempts +=1 업데이트, 제한 3회)
