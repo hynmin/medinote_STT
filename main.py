@@ -14,7 +14,6 @@ from dotenv import load_dotenv
 # .env 파일 로드
 load_dotenv()
 
-
 def load_reference_text(args):
     """
     평가용 참조 텍스트 로드
@@ -94,19 +93,19 @@ def main():
         print("="*50)
         print(result["text"])
 
-        # RTF 계산 및 cli 출력
-        rtf = compute_rtf(result.get("processing_time", 0), result.get("audio_duration", 0))
-        audio_duration = result.get("audio_duration")
+        # RTF(= 처리시간/오디오길이) 계산 및 cli 출력
+        rtf = compute_rtf(result.get("processing_time", 0), result.get("audio_length", 0))
+        audio_length = result.get("audio_length")
         file_size_mb = audio_path.stat().st_size / (1024 * 1024)  # bytes to MB
 
         print(f"\n⚡ Performance")
         print(f"  파일 크기: {file_size_mb:.2f} MB")
-        if audio_duration and audio_duration > 0:
+        if audio_length and audio_length > 0:
             if rtf <= 1.0:
-                print(f"  RTF: {rtf:.4f} (실시간보다 {1/rtf:.2f}배 빠름)")
+                print(f"  RTF: {rtf:.4f} (오디오 길이 대비 {1/rtf:.2f}배 짧은 시간동안 처리됨)")
             else:
-                print(f"  RTF: {rtf:.4f} (실시간보다 {rtf:.2f}배 느림)")
-            print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {audio_duration:.2f}초")
+                print(f"  RTF: {rtf:.4f} (오디오 길이 대비 {rtf:.2f}배 긴 시간동안 처리됨)")
+            print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 / 오디오 길이: {audio_length:.2f}초")
         else:
             print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 (RTF 계산 불가 - 오디오 길이 정보 없음)")
 
@@ -114,12 +113,11 @@ def main():
         tid = save_transcript(
             result,
             result.get("processing_time"),
-            result.get("audio_duration"),
+            result.get("audio_length"),
             rtf,
-            not args.no_noise_reduction,
             db_path
         )
-        print(f"🗄️  Saved to DB: {db_path} (transcript_id={tid})")
+        print(f"🗄️  Saved to DB: {db_path} (stt_id={tid})")
 
         # AI 요약 생성
         if result["text"].strip():
@@ -127,15 +125,13 @@ def main():
             try:
                 summary_result = generate_summary(  # 요약정리 생성
                     transcript_text=result["text"],
-                    model="gpt-4o-mini"
                 )
 
                 summary_id = save_summary(          # 요약정리 DB 저장
-                    transcript_id=tid,
-                    chief_complaint=summary_result["chief_complaint"],
-                    diagnosis=summary_result["diagnosis"],
-                    recommendation=summary_result["recommendation"],
-                    model=summary_result["model"],
+                    stt_id=tid,
+                    symptoms=summary_result["symptoms"],
+                    diagnosis_name=summary_result["diagnosis_name"],
+                    notes=summary_result["notes"],
                     summary_time=summary_result["summary_time"],
                     db_path=db_path
                 )
@@ -145,11 +141,11 @@ def main():
                 print("AI 요약")
                 print("="*50)
                 print(f"\n  증상:")
-                print(f"  {summary_result['chief_complaint']}")
+                print(f"  {summary_result['symptoms']}")
                 print(f"\n  진단:")
-                print(f"  {summary_result['diagnosis']}")
+                print(f"  {summary_result['diagnosis_name']}")
                 print(f"\n 소견:")
-                for line in summary_result['recommendation'].split('\n'):
+                for line in summary_result['notes'].split('\n'):
                     if line.strip():
                         print(line)
                 print(f"\n 요약 생성 시간: {summary_result['summary_time']}초 (summary_id={summary_id})")

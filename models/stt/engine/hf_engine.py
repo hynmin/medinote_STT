@@ -63,19 +63,19 @@ class HFWhisperSTT:
 
         # 오디오 로드
         y, sr = librosa.load(audio_path, sr=16000, mono=True)
-        audio_duration = len(y) / sr
+        audio_length = len(y) / sr
 
         # 1) 너무 짧은 오디오 체크
-        if audio_duration < STTConfig.MIN_AUDIO_DURATION:
-            print(f"  Audio too short ({audio_duration:.1f}s < {STTConfig.MIN_AUDIO_DURATION}s). Returning empty result.")
+        if audio_length < STTConfig.MIN_AUDIO_LENGTH:
+            print(f"  Audio too short ({audio_length:.1f}s < {STTConfig.MIN_AUDIO_LENGTH}s). Returning empty result.")
             processing_time = time.time() - start_time
             return {
                 "text": "",
                 "audio_file": Path(audio_path).name,
                 "model": self.model_name,
                 "processing_time": round(processing_time, 2),
-                "audio_duration": round(audio_duration, 2),
-                "rtf": round(processing_time / max(audio_duration, 0.001), 4)
+                "audio_length": round(audio_length, 2),
+                "rtf": round(processing_time / max(audio_length, 0.001), 4)
             }
 
         # 2) 무음 체크 (RMS 에너지)
@@ -89,8 +89,8 @@ class HFWhisperSTT:
                 "audio_file": Path(audio_path).name,
                 "model": self.model_name,
                 "processing_time": round(processing_time, 2),
-                "audio_duration": round(audio_duration, 2),
-                "rtf": round(processing_time / max(audio_duration, 0.001), 4)
+                "audio_length": round(audio_length, 2),
+                "rtf": round(processing_time / max(audio_length, 0.001), 4)
             }
 
         # STT 수행 (ffmpeg 미설치 시 librosa로 대체 로딩)
@@ -122,7 +122,7 @@ class HFWhisperSTT:
             "audio_file": Path(audio_path).name,
             "model": self.model_name,
             "processing_time": round(processing_time, 2),
-            "audio_duration": round(audio_duration, 2),
+            "audio_length": round(audio_length, 2),
             "timestamp": datetime.now().isoformat(),
             "segments": result.get("chunks", [])  # Whisper segments 포함 (신뢰도 계산용)
         }
@@ -137,7 +137,7 @@ class HFWhisperSTT:
 
         return output
 
-    def _get_audio_duration(self, audio_path):
+    def _get_audio_length(self, audio_path):
         """오디오 파일 길이를 초 단위로 반환"""
         y, sr = librosa.load(audio_path, sr=None)
         return librosa.get_duration(y=y, sr=sr)

@@ -41,7 +41,7 @@ class OpenAIWhisperSTT:
                 "audio_file": 파일명,
                 "model": 모델명,
                 "processing_time": 처리시간,
-                "audio_duration": 오디오 길이
+                "audio_length": 오디오 길이
             }
         """
         file_size = os.path.getsize(audio_path)
@@ -79,17 +79,17 @@ class OpenAIWhisperSTT:
 
         if response_format == "verbose_json":
             text = response.text
-            audio_duration = response.duration if hasattr(response, 'duration') else None
+            audio_length = response.duration if hasattr(response, 'duration') else None
         else:
             text = response.text if hasattr(response, 'text') else response.get("text", "")
-            audio_duration = None
+            audio_length = None
 
         return {
             "text": text,
             "audio_file": Path(audio_path).name,
             "model": f"openai/{self.model}",
             "processing_time": round(processing_time, 2),
-            "audio_duration": audio_duration,
+            "audio_length": audio_length,
             "timestamp": datetime.now().isoformat()
         }
 
@@ -150,7 +150,7 @@ class OpenAIWhisperSTT:
         else:
             audio = AudioSegment.from_file(audio_path)
 
-        audio_duration_sec = len(audio) / 1000  # 밀리초 → 초
+        audio_length_sec = len(audio) / 1000  # 밀리초 → 초
 
         # 10분 단위로 분할
         chunks = []
@@ -182,7 +182,7 @@ class OpenAIWhisperSTT:
             "audio_file": Path(audio_path).name,
             "model": f"openai/{self.model}",
             "processing_time": round(processing_time, 2),
-            "audio_duration": round(audio_duration_sec, 2),
+            "audio_length": round(audio_length_sec, 2),
             "timestamp": datetime.now().isoformat()
         }
 

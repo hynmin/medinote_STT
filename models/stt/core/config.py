@@ -38,7 +38,7 @@ class STTConfig:
     NOISE_REDUCTION = True
 
     # Silence/short audio thresholds
-    MIN_AUDIO_DURATION = 1.0
+    MIN_AUDIO_LENGTH = 1.0
     SILENCE_RMS_THRESHOLD = 0.01
 
     # Initial prompt for Whisper

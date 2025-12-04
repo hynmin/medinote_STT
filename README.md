@@ -147,12 +147,15 @@ transcript_id 반환
 [STT처리 & S3 업로드 병렬 처리]
 1) STT 처리
 로컬 파일 읽어서 stt.transcribe() 실행. result["text"] 생성
-→ STT_Transcript에 transcript_text 저장, processing_time, audio_duration, rtf 저장
-→ STT_Metrics 저장 (transcript_id 참조)
+→ STT_Transcript에 transcript_text 저장, processing_time, audio_length, rtf 저장
 → stt_status = 'trascribed' 업데이트
 → generate_summary() 실행 → STT_Summary 저장,
 → stt_status = 'completed' 업데이트
 
 2) S3업로드
 → S3 업로드 성공 : S3_url 저장, S3_status='S3_uploaded' & 로컬 임시파일 삭제 
-→ S3 업로드 실패 : S3_stautus = 'S3_failed' (로컬 파일 유지, 백그라운드 재시도 attempts +=1 업데이트, 제한 3회)
+→ S3 업로드 실패 : S3_status = 'S3_failed' (로컬 파일 유지, 백그라운드 재시도 attempts +=1 업데이트, 제한 3회)
+
+# 할일
+- fastapi 연동
+- S3 연결( s3_url, full_text )

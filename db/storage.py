@@ -23,36 +23,32 @@ def init_db(db_path: str):
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS STT_Transcript (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stt_id  INTEGER PRIMARY KEY AUTOINCREMENT,
             audio_file TEXT,
-            model TEXT,
             transcript_text TEXT,
             processing_time REAL,
-            audio_duration REAL,
+            audio_length REAL,
             rtf REAL,
             file_size INTEGER,
-            noise_reduction INTEGER,
             s3_url TEXT,
-            stt_error TEXT,
+            stt_status TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
 
-    # STT 요약 결과 테이블
+    # STT 요약 결과 테이블 (추후 retry 기능 추가) -> visit에 response
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS STT_Summary (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            transcript_id INTEGER NOT NULL,
-            chief_complaint TEXT,
-            diagnosis TEXT,
-            recommendation TEXT,
-            model TEXT,
+            summ_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stt_id INTEGER NOT NULL,
+            symptoms TEXT,
+            diagnosis_name TEXT,
+            notes TEXT,            
             summary_time REAL,
-            summary_error TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(transcript_id) REFERENCES STT_Transcript(id)
+            FOREIGN KEY(stt_id) REFERENCES STT_Transcript(stt_id)
         )
         """
     )
@@ -64,96 +60,73 @@ def init_db(db_path: str):
 def save_transcript(
     result: dict,
     processing_time: float,
-    audio_duration: float,
+    audio_length: float,
     rtf: float,
-    noise_reduction: bool,
     db_path: str,
     file_size: int = None,
     s3_url: str = None,  # 프로덕션: S3 URL, 로컬 테스트: 로컬 경로
-    stt_error: str = None
+    stt_status: str = None
 ) -> int:
-    """STT_Transcript 테이블에 저장하고 id 반환."""
     con = sqlite3.connect(db_path)
     cur = con.cursor()
     cur.execute(
         """
         INSERT INTO STT_Transcript (
-            audio_file, model, transcript_text, processing_time, audio_duration, rtf,
-            file_size, noise_reduction, s3_url, stt_error, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            audio_file, transcript_text, processing_time, audio_length, rtf,
+            file_size, s3_url, stt_status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             result.get("audio_file"),
-            result.get("model"),
             result.get("text"),
             float(processing_time) if processing_time is not None else None,
-            float(audio_duration) if audio_duration is not None else None,
+            float(audio_length) if audio_length is not None else None,
             float(rtf) if rtf is not None else None,
             file_size,
-            1 if noise_reduction else 0,
             s3_url,
-            stt_error,
+            stt_status,
             datetime.now().isoformat(),
         ),
     )
-    tid = cur.lastrowid #transcript id
+    stt_id = cur.lastrowid #transcript id
     con.commit()
     con.close()
-    return tid
+    return stt_id
 
 
 def save_summary(
-    transcript_id: int,
-    chief_complaint: str,
-    diagnosis: str,
-    recommendation: str,
-    model: str,
+    stt_id: int,
+    symptoms: str,
+    diagnosis_name: str,
+    notes: str,
     summary_time: float,
     db_path: str,
     summary_error: str = None
 ) -> int:
-    """
-    AI 요약 결과를 STT_Summary 테이블에 저장
-
-    Args:
-        transcript_id: STT_Transcript 테이블의 ID (외래키)
-        chief_complaint: 증상
-        diagnosis: 진단
-        recommendation: 권고사항
-        model: 사용한 GPT 모델 (예: gpt-4o-mini)
-        summary_time: 요약 생성 시간(초)
-        db_path: DB 파일 경로
-        summary_error: 요약 생성 중 발생한 에러 메시지
-
-    Returns:
-        생성된 summary의 ID
-    """
     con = sqlite3.connect(db_path)
     cur = con.cursor()
 
     cur.execute(
         """
         INSERT INTO STT_Summary (
-            transcript_id, chief_complaint, diagnosis, recommendation, model, summary_time, summary_error
+            stt_id, symptoms, diagnosis_name, notes, summary_time
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?)
         """,
         (
-            transcript_id,
-            chief_complaint,
-            diagnosis,
-            recommendation,
-            model,
+            stt_id,
+            symptoms,
+            diagnosis_name,
+            notes,
             float(summary_time) if summary_time is not None else None,
-            summary_error,
         ),
     )
 
-    summary_id = cur.lastrowid
+    summ_id = cur.lastrowid
     con.commit()
     con.close()
 
-    return summary_id
+    return summ_id
 
 
 

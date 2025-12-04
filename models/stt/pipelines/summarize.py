@@ -10,20 +10,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def generate_summary(transcript_text: str, model: str = "gpt-4o-mini") -> dict:
+def generate_summary(transcript_text: str) -> dict:
     """
     STT 결과를 OpenAI로 요약
 
     Args:
         transcript_text: STT로 변환된 전체 대화 텍스트
-        model: 사용할 OpenAI 모델 (기본: gpt-4o-mini)
+        model:  gpt-4o-mini
 
     Returns:
         dict: {
-            "chief_complaint": "증상",
-            "diagnosis": "진단",
-            "recommendation": "권고사항",
-            "model": "gpt-4o-mini",
+            "symptoms": "증상",
+            "diagnosis_name": "진단",
+            "notes": "권고사항",
             "summary_time": 1.23  # 초
         }
     """
@@ -60,7 +59,7 @@ def generate_summary(transcript_text: str, model: str = "gpt-4o-mini") -> dict:
 
     try:
         response = client.chat.completions.create(
-            model=model,
+            model='gpt-4o-mini',
             messages=[
                 {"role": "system", "content": "당신은 의료 상담 기록을 이해하기 쉬운 말로 정확하게 요약하는 전문가입니다."},
                 {"role": "user", "content": prompt}
@@ -78,20 +77,18 @@ def generate_summary(transcript_text: str, model: str = "gpt-4o-mini") -> dict:
         sections = parse_summary_sections(content)
 
         return {
-            "chief_complaint": sections.get("증상", ""),
-            "diagnosis": sections.get("진단", ""),
-            "recommendation": sections.get("권고사항", ""),
-            "model": model,
+            "symptoms": sections.get("증상", ""),
+            "diagnosis_name": sections.get("진단", ""),
+            "notes": sections.get("권고사항", ""),
             "summary_time": round(summary_time, 2)
         }
 
     except Exception as e:
         print(f"❌ OpenAI API 호출 실패: {e}")
         return {
-            "chief_complaint": "요약 생성 실패",
-            "diagnosis": "요약 생성 실패",
-            "recommendation": "요약 생성 실패",
-            "model": model,
+            "symptoms": "요약 생성 실패",
+            "diagnosis_name": "요약 생성 실패",
+            "notes": "요약 생성 실패",
             "summary_time": 0.0
         }
 

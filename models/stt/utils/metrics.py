@@ -103,17 +103,17 @@ def compute_metrics(ref_text: str, hyp_text: str, remove_fillers=True) -> dict:
     }
 
 
-def compute_rtf(processing_time: float, audio_duration: float) -> float:
+def compute_rtf(processing_time: float, audio_length: float) -> float:
     """RTF (Real-time Factor) 계산.
 
     Args:
         processing_time: 처리 시간(초)
-        audio_duration: 오디오 길이(초)
+        audio_length: 오디오 길이(초)
 
     Returns: rtf (float)
     """
-    if audio_duration is None or audio_duration <= 0:
+    if audio_length is None or audio_length <= 0:
         return 0.0
 
-    return round(processing_time / audio_duration, 4)
+    return round(processing_time / audio_length, 4)
 
