@@ -116,4 +116,3 @@ def compute_rtf(processing_time: float, audio_length: float) -> float:
         return 0.0
 
     return round(processing_time / audio_length, 4)
-

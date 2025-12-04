@@ -33,22 +33,22 @@ nano .env     # Linux/Mac
 #### 오디오 파일 변환
 ```bash
 # STT 변환
-python main.py tests/sample_audio/consultation.mp3
+python tests/test_cli.py tests/sample_audio/consultation.mp3
 
 # 모델 선택
-python main.py tests/sample_audio/consultation.mp3 --model fast      # 빠름 (기본값)
-python main.py tests/sample_audio/consultation.mp3 --model balanced  # 균형
-python main.py tests/sample_audio/consultation.mp3 --model accurate  # 정확
+python tests/test_cli.py tests/sample_audio/consultation.mp3 --model fast      # 빠름 (기본값)
+python tests/test_cli.py tests/sample_audio/consultation.mp3 --model balanced  # 균형
+python tests/test_cli.py tests/sample_audio/consultation.mp3 --model accurate  # 정확
 
-python main.py tests/sample_audio/consultation.mp3 --model whisper-1 
-python main.py tests/sample_audio/consultation.mp3 --model gpt-4o-transcribe    # gpt-4o
-python main.py tests/sample_audio/consultation.mp3 --model gpt-4o-mini-transcribe  # gpt-4o-mini
+python tests/test_cli.py tests/sample_audio/consultation.mp3 --model whisper-1 
+python tests/test_cli.py tests/sample_audio/consultation.mp3 --model gpt-4o-transcribe    # gpt-4o
+python tests/test_cli.py tests/sample_audio/consultation.mp3 --model gpt-4o-mini-transcribe  # gpt-4o-mini
 ```
 
 #### 평가 지표 확인 (개발/테스트용)
 ```bash
 # 참조 텍스트 파일 사용하여 WER/CER 확인
-python main.py tests/sample_audio/consultation.mp3 --ref-file tests/reference.txt
+python tests/test_cli.py tests/sample_audio/consultation.mp3 --ref-file tests/reference.txt
 ```
 
 #### CLI 기반 녹음 테스트용

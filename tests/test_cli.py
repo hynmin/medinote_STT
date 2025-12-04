@@ -3,12 +3,12 @@ STT 실행 메인 파일
 """
 import argparse
 from pathlib import Path
-from models.stt.engine.hf_engine import HFWhisperSTT
-from models.stt.engine.openai_engine import OpenAIWhisperSTT
-from db.storage import init_db, save_transcript, save_summary
-from models.stt.utils.metrics import compute_metrics, compute_rtf
-from models.stt.core.config import STTConfig
-from models.stt.pipelines.summarize import generate_summary
+from core.engine.hf_engine import HFWhisperSTT
+from core.engine.openai_engine import OpenAIWhisperSTT
+from core.crud import init_db, save_transcript, save_summary
+from core.metrics import compute_metrics, compute_rtf
+from core.config import STTConfig
+from core.summarize import generate_summary
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -76,8 +76,7 @@ def main():
         )
 
     # 테이블 없으면 생성
-    db_path = STTConfig.DB_PATH
-    init_db(db_path)
+    init_db()
     
     audio_path = Path(args.audio_path)
     
@@ -110,14 +109,13 @@ def main():
             print(f"  처리 시간: {result.get('processing_time', 0):.2f}초 (RTF 계산 불가 - 오디오 길이 정보 없음)")
 
         # STT 결과 DB저장
-        tid = save_transcript(
+        stt_id = save_transcript(
             result,
             result.get("processing_time"),
             result.get("audio_length"),
-            rtf,
-            db_path
+            rtf
         )
-        print(f"🗄️  Saved to DB: {db_path} (stt_id={tid})")
+        print(f"🗄️  Saved to PostgreSQL (stt_id={stt_id})")
 
         # AI 요약 생성
         if result["text"].strip():
@@ -128,12 +126,10 @@ def main():
                 )
 
                 summary_id = save_summary(          # 요약정리 DB 저장
-                    stt_id=tid,
+                    stt_id=stt_id,
                     symptoms=summary_result["symptoms"],
                     diagnosis_name=summary_result["diagnosis_name"],
-                    notes=summary_result["notes"],
-                    summary_time=summary_result["summary_time"],
-                    db_path=db_path
+                    notes=summary_result["notes"]
                 )
 
                 # 터미널에 요약 출력

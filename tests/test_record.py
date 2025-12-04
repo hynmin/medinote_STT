@@ -110,9 +110,9 @@ def main():
                         print("\n🤖 STT 처리 중...")
                         print("-" * 50)
 
-                        # main.py 실행
+                        # test_cli.py 실행
                         result = subprocess.run(
-                            [sys.executable, "main.py", str(recorded_file)],
+                            [sys.executable, "tests/test_cli.py", str(recorded_file)],
                             capture_output=False
                         )
 

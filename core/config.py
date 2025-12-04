@@ -1,4 +1,4 @@
-﻿"""
+"""
 STT config
 """
 from pathlib import Path
@@ -6,7 +6,7 @@ import torch
 
 class STTConfig:
     """STT settings"""
-    
+
     # HuggingFace 로컬 모델
     HF_MODELS = {
         "fast": "openai/whisper-small",
@@ -25,13 +25,12 @@ class STTConfig:
     ALL_MODELS = {**HF_MODELS, **API_MODELS}
     MODEL_CHOICES = list(ALL_MODELS.keys())
     DEFAULT_MODEL = "fast"
-    
+
     LANGUAGE = "korean"
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"  # GPU 자동 감지
 
     # Paths
     AUDIO_DIR = "tests/sample_audio"
-    DB_PATH = "db/transcripts.db"
     REF_FILE = "tests/reference.txt"
 
     # Noise handling
@@ -43,7 +42,7 @@ class STTConfig:
 
     # Initial prompt for Whisper
     INITIAL_PROMPT = "의료 상담 음성입니다. 의료종사자와 환자 대화입니다."
-    
+
     @classmethod
     def get_model(cls, model_name):
         """모델 경로/이름 반환"""
@@ -58,7 +57,7 @@ class STTConfig:
     def is_api_model(cls, name):
         """API 모델인지 확인"""
         return name in cls.API_MODELS
-    
+
     @classmethod
     def get_device(cls):
         """Return device id (cuda -> 0, cpu -> -1)."""
@@ -66,4 +65,3 @@ class STTConfig:
 
 # Ensure directories exist
 Path(STTConfig.AUDIO_DIR).mkdir(parents=True, exist_ok=True)
-Path("db").mkdir(exist_ok=True)

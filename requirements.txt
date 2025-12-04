@@ -9,4 +9,8 @@ openai>=1.0.0
 pydub>=0.25.0
 python-dotenv>=1.0.0
 sounddevice>=0.4.6
-psycopg2-binary>=2.9.0
+sqlalchemy
+psycopg2-binary
+fastapi>=0.100.0
+uvicorn>=0.23.0
+httpx>=0.24.0

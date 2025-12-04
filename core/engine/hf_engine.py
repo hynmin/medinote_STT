@@ -5,10 +5,10 @@ from transformers import pipeline
 import time
 from pathlib import Path
 from datetime import datetime
-from models.stt.core.config import STTConfig
+from core.config import STTConfig
 import librosa
 import numpy as np
-from models.stt.utils.metrics import compute_metrics
+from core.metrics import compute_metrics
 
 
 class HFWhisperSTT:
